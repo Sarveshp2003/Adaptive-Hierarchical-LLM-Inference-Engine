@@ -1,0 +1,52 @@
+#ifndef TRANSFORMER_LAYER_H
+#define TRANSFORMER_LAYER_H
+
+
+#include "Linear.h"
+#include "LayerNorm.h"
+#include "Tensor.h"
+
+
+class TransformerLayer
+{
+
+private:
+
+    int hiddenSize;
+
+    Linear linear;
+
+    LayerNorm norm1;
+
+    LayerNorm norm2;
+
+    Tensor workspace;
+
+
+
+public:
+
+
+    TransformerLayer(
+        int hiddenSize
+    );
+
+
+    ~TransformerLayer();
+
+
+
+    void forward(
+        Tensor& input,
+        Tensor& output
+    );
+
+
+    int getHiddenSize() const;
+
+
+};
+
+
+
+#endif

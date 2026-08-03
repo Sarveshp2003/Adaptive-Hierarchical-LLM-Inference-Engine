@@ -1,0 +1,135 @@
+#include "TransformerLayer.h"
+
+#include "CUDAStream.h"
+
+#include <iostream>
+
+TransformerLayer::TransformerLayer(
+    int hiddenSize
+)
+
+:
+
+hiddenSize(hiddenSize),
+
+linear(
+    hiddenSize,
+    hiddenSize
+),
+
+norm1(
+    hiddenSize
+),
+
+norm2(
+    hiddenSize
+),
+
+workspace(
+    { hiddenSize },
+    DataType::FP32
+)
+
+{
+
+    workspace.allocateGPU();
+
+    std::cout
+        << "Transformer Layer created. Hidden size: "
+        << hiddenSize
+        << std::endl;
+
+}
+
+TransformerLayer::~TransformerLayer()
+{
+
+}
+
+void TransformerLayer::forward(
+    Tensor& input,
+    Tensor& output
+)
+{
+
+    Tensor norm1(
+        input.shape(),
+        DataType::FP32
+    );
+
+
+    Tensor attentionOut(
+        input.shape(),
+        DataType::FP32
+    );
+
+
+    Tensor norm2(
+        input.shape(),
+        DataType::FP32
+    );
+
+
+    Tensor mlpOut(
+        input.shape(),
+        DataType::FP32
+    );
+
+
+
+    // Pre attention normalization
+    layerNorm1.forward(
+        input,
+        norm1
+    );
+
+
+
+    // Attention
+    attention.forward(
+        norm1,
+        attentionOut
+    );
+
+
+
+    // Residual
+    add(
+        input,
+        attentionOut,
+        output
+    );
+
+
+
+    // Second normalization
+    layerNorm2.forward(
+        output,
+        norm2
+    );
+
+
+
+    // Feed forward network
+    mlp.forward(
+        norm2,
+        mlpOut
+    );
+
+
+
+    // Final residual
+    add(
+        output,
+        mlpOut,
+        output
+    );
+
+}
+
+int TransformerLayer::getHiddenSize() const
+{
+
+    return hiddenSize;
+
+}

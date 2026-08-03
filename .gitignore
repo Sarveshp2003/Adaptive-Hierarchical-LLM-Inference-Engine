@@ -1,0 +1,73 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+.kotlin
+
+# Generated build and runtime artifacts
+build/
+build-*/
+artifacts/
+out/
+tmp/
+*.log
+*.tmp
+*.pdb
+*.ilk
+*.obj
+*.tlog
+*.cache
+*.user
+*.suo
+*.opendb
+*.VC.db
+*.VC.VC.opendb
+
+# Local model and large data artifacts
+models/**/*.gguf
+models/**/*.bin
+models/**/*.safetensors
+*.gguf
+*.bin
+*.safetensors
+
+# Python / Java temporary files
+__pycache__/
+.pytest_cache/
+.gradle/
+*.class
+.class/
+
+### IntelliJ IDEA ###
+.idea/modules.xml
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/libraries/
+*.iws
+*.iml
+*.ipr
+
+### Eclipse ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Mac OS ###
+.DS_Store
