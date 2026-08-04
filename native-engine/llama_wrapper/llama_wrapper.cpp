@@ -2,6 +2,8 @@
 #include <thread>
 #include <cstdlib>
 #include <iostream>
+#include <vector>
+#include <mutex>
 
 #ifdef HAVE_LLAMA
 // When built with the llama submodule, include public headers here (optional)
@@ -36,6 +38,9 @@ extern "C" {
 
 #ifdef HAVE_LLAMA
     static struct llama_model * g_model = nullptr;
+    // Per-model cached layers bitmap and mutex to protect it
+    static std::vector<char> g_layer_cached;
+    static std::mutex g_cache_mutex;
 #endif
 
     static void lw_start() {
@@ -48,6 +53,10 @@ extern "C" {
             g_model = llama_model_load_from_file(path, mparams);
             if (g_model) {
                 std::cout << "[llama_wrapper] loaded model: " << path << "\n";
+                // initialize cache bitmap based on number of model layers
+                int nlayer = llama_model_n_layer(g_model);
+                std::lock_guard<std::mutex> lk(g_cache_mutex);
+                g_layer_cached.assign(nlayer, 0);
             } else {
                 std::cerr << "[llama_wrapper] failed to load model: " << path << "\n";
             }
@@ -61,6 +70,8 @@ extern "C" {
         if (g_model) {
             llama_model_free(g_model);
             g_model = nullptr;
+            std::lock_guard<std::mutex> lk(g_cache_mutex);
+            g_layer_cached.clear();
             std::cout << "[llama_wrapper] freed model\n";
         }
 #endif
@@ -69,10 +80,14 @@ extern "C" {
 
     static long lw_prefetchLayer(int layerId) {
 #ifdef HAVE_LLAMA
-        // Prefetch could map to loading a layer into RAM; llama.cpp handles this internally when using llama_model_load_from_file.
         if (g_model) {
-            // No-op for now, return small latency
-            return 5;
+            std::lock_guard<std::mutex> lk(g_cache_mutex);
+            if (layerId < 0 || layerId >= (int)g_layer_cached.size()) return -1;
+            if (g_layer_cached[layerId]) return 0; // already cached
+            // simulate prefetch cost and mark cached
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            g_layer_cached[layerId] = 1;
+            return 10;
         }
 #endif
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
@@ -81,8 +96,12 @@ extern "C" {
     static long lw_evictLayer(int layerId) {
 #ifdef HAVE_LLAMA
         if (g_model) {
-            // No direct API to evict a single layer; return simulated latency
-            return 1;
+            std::lock_guard<std::mutex> lk(g_cache_mutex);
+            if (layerId < 0 || layerId >= (int)g_layer_cached.size()) return -1;
+            if (!g_layer_cached[layerId]) return 0; // already evicted
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            g_layer_cached[layerId] = 0;
+            return 2;
         }
 #endif
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -152,7 +171,10 @@ extern "C" {
     static int lw_getCachedLayers() {
 #ifdef HAVE_LLAMA
         if (g_model) {
-            return 2;
+            std::lock_guard<std::mutex> lk(g_cache_mutex);
+            int count = 0;
+            for (char c : g_layer_cached) if (c) ++count;
+            return count;
         }
 #endif
         return 2;
