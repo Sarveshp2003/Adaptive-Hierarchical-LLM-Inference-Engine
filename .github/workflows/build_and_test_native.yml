@@ -39,7 +39,18 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           set -e
+          set -x
+          echo "=== Diagnostics ==="
+          echo "USER: $(whoami)"
+          echo "PWD: $(pwd)"
           echo "JAVA_HOME: $JAVA_HOME"
+          echo "Java version:"; java -version || true
+          echo "javac version:"; javac -version || true
+          echo "which g++:"; which g++ || true
+          echo "g++ --version:"; g++ --version || true
+          echo "ls root:"; ls -lah || true
+          cat /etc/os-release || true
+          echo "=== Begin build ==="
           mkdir -p lib
           echo "[COMPILE] Building adaptive_scheduler native lib"
           g++ -shared -fPIC -O2 -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -I"src/main/cpp/headers" -o lib/libadaptive_scheduler.so src/main/cpp/adaptive_scheduler.cpp -pthread || (echo "adaptive_scheduler build failed"; exit 1)
