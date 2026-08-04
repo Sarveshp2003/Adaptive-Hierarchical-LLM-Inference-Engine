@@ -41,10 +41,15 @@ extern "C" {
 
 #ifdef HAVE_LLAMA
     static struct llama_model * g_model = nullptr;
+    static struct llama_context * g_context = nullptr;
     // Per-model cached layers bitmap and mutex to protect it
     static std::vector<char> g_layer_cached;
     // Per-layer pin (refcount) to prevent eviction while in use
     static std::vector<int> g_layer_refcount;
+    // Per-layer buffer sizes (in bytes) for real KV tracking
+    static std::vector<size_t> g_layer_buffer_sizes;
+    // Current layer allocations (kvPageId -> is_allocated)
+    static std::vector<char> g_layer_allocated;
     static std::mutex g_cache_mutex;
 #endif
 
@@ -71,6 +76,25 @@ extern "C" {
                 std::lock_guard<std::mutex> lk(g_cache_mutex);
                 g_layer_cached.assign(nlayer, 0);
                 g_layer_refcount.assign(nlayer, 0);
+                g_layer_allocated.assign(nlayer, 0);
+                
+                // Estimate layer buffer sizes (simplified: assume uniform per layer)
+                // Real size = (n_head * head_dim * seq_len * 2) * element_size
+                // For Llama-3.2-3B: ~2.2GB total KV for context=2048
+                // Rough per-layer: ~78MB for 28 layers
+                size_t estimated_per_layer = 78 * 1024 * 1024;
+                g_layer_buffer_sizes.assign(nlayer, estimated_per_layer);
+                
+                // Create context for KV cache management
+                struct llama_context_params cparams = llama_context_default_params();
+                cparams.n_ctx = 1024;  // 1K context window for now
+                cparams.n_batch = 256;
+                g_context = llama_new_context_with_model(g_model, cparams);
+                if (g_context) {
+                    std::cout << "[llama_wrapper] created context: n_ctx=" << cparams.n_ctx << " n_batch=" << cparams.n_batch << "\n";
+                } else {
+                    std::cerr << "[llama_wrapper] warning: could not create context (OOM?), falling back to simulation\n";
+                }
             } else {
                 std::cerr << "[llama_wrapper] failed to load model: " << path << " -- llama_model_load_from_file returned NULL\n";
             }
@@ -81,12 +105,19 @@ extern "C" {
 
     static void lw_stop() {
 #ifdef HAVE_LLAMA
+        if (g_context) {
+            llama_free(g_context);
+            g_context = nullptr;
+        }
         if (g_model) {
             llama_model_free(g_model);
             g_model = nullptr;
             std::lock_guard<std::mutex> lk(g_cache_mutex);
             g_layer_cached.clear();
-            std::cout << "[llama_wrapper] freed model\n";
+            g_layer_refcount.clear();
+            g_layer_allocated.clear();
+            g_layer_buffer_sizes.clear();
+            std::cout << "[llama_wrapper] freed model and context\n";
         }
 #endif
         std::cout << "[llama_wrapper] stop()\n";
@@ -146,16 +177,34 @@ extern "C" {
         if (g_model) {
             auto start = std::chrono::high_resolution_clock::now();
             std::lock_guard<std::mutex> lk(g_cache_mutex);
+            
             if (kvPageId < 0 || kvPageId >= (long)llama_model_n_layer(g_model)) {
                 return -1;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            
+            // Simulate moving buffer to RAM
+            // In real implementation: copy from GPU memory to RAM using ggml_backend APIs
+            // For now: estimate latency based on buffer size
+            size_t buffer_size = g_layer_buffer_sizes[kvPageId];
+            // Assume ~1GB/sec bandwidth: latency = size / 1GB
+            long estimated_latency = (buffer_size + 1073741823) / 1073741824;  // Round up to 1ms min
+            if (estimated_latency < 1) estimated_latency = 1;
+            
+            // Mark as allocated in RAM
+            g_layer_allocated[kvPageId] = 1;
+            
+            // Sleep for realistic latency
+            std::this_thread::sleep_for(std::chrono::milliseconds(estimated_latency));
+            
             auto end = std::chrono::high_resolution_clock::now();
             auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-            std::cout << "[llama_wrapper] moveKvToRam: kvPageId=" << kvPageId << " latency=" << latency.count() << "ms\n";
+            std::cout << "[llama_wrapper] moveKvToRam: kvPageId=" << kvPageId 
+                      << " buffer_size=" << (buffer_size / (1024*1024)) << "MB"
+                      << " latency=" << latency.count() << "ms\n";
             return latency.count();
         }
 #endif
+        // Fallback simulation
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
         return 2;
     }
@@ -164,16 +213,34 @@ extern "C" {
         if (g_model) {
             auto start = std::chrono::high_resolution_clock::now();
             std::lock_guard<std::mutex> lk(g_cache_mutex);
+            
             if (kvPageId < 0 || kvPageId >= (long)llama_model_n_layer(g_model)) {
                 return -1;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(3));
+            
+            // Simulate moving buffer to GPU
+            // In real implementation: use ggml_backend_buffer_copy for GPU memory
+            // Assume GPU bandwidth ~2x faster than RAM (~2GB/sec)
+            size_t buffer_size = g_layer_buffer_sizes[kvPageId];
+            // latency = size / 2GB
+            long estimated_latency = (buffer_size + 2147483647) / 2147483648;
+            if (estimated_latency < 1) estimated_latency = 1;
+            
+            // Mark as NOT allocated in RAM (moved to GPU)
+            g_layer_allocated[kvPageId] = 0;
+            
+            // Sleep for realistic latency
+            std::this_thread::sleep_for(std::chrono::milliseconds(estimated_latency));
+            
             auto end = std::chrono::high_resolution_clock::now();
             auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-            std::cout << "[llama_wrapper] moveKvToGpu: kvPageId=" << kvPageId << " latency=" << latency.count() << "ms\n";
+            std::cout << "[llama_wrapper] moveKvToGpu: kvPageId=" << kvPageId 
+                      << " buffer_size=" << (buffer_size / (1024*1024)) << "MB"
+                      << " latency=" << latency.count() << "ms\n";
             return latency.count();
         }
 #endif
+        // Fallback simulation
         std::this_thread::sleep_for(std::chrono::milliseconds(3));
         return 3;
     }
@@ -182,36 +249,64 @@ extern "C" {
         if (g_model) {
             auto start = std::chrono::high_resolution_clock::now();
             std::lock_guard<std::mutex> lk(g_cache_mutex);
+            
             if (kvPageId < 0 || kvPageId >= (long)llama_model_n_layer(g_model)) {
                 return -1;
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(4));
+            
+            // Simulate KV compression using quantization
+            // Typical compression: F16 -> I8 = 50% reduction
+            // Compression speed: ~100MB/sec (CPU bound)
+            size_t buffer_size = g_layer_buffer_sizes[kvPageId];
+            // latency = size / 100MB
+            long estimated_latency = (buffer_size + 104857599) / 104857600;
+            if (estimated_latency < 1) estimated_latency = 1;
+            
+            // Reduce buffer size by 50% (simulate compression)
+            g_layer_buffer_sizes[kvPageId] = buffer_size / 2;
+            
+            // Sleep for realistic latency
+            std::this_thread::sleep_for(std::chrono::milliseconds(estimated_latency));
+            
             auto end = std::chrono::high_resolution_clock::now();
             auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-            std::cout << "[llama_wrapper] compressKv: kvPageId=" << kvPageId << " latency=" << latency.count() << "ms\n";
+            std::cout << "[llama_wrapper] compressKv: kvPageId=" << kvPageId 
+                      << " original_size=" << (buffer_size / (1024*1024)) << "MB"
+                      << " compressed_size=" << (g_layer_buffer_sizes[kvPageId] / (1024*1024)) << "MB"
+                      << " latency=" << latency.count() << "ms\n";
             return latency.count();
         }
 #endif
+        // Fallback simulation
         std::this_thread::sleep_for(std::chrono::milliseconds(4));
         return 4;
     }
     static long lw_offloadKv(long kvPageId) {
 #ifdef HAVE_LLAMA
         if (g_model) {
-            auto start = std::chrono::high_resolution_clock::now();
-            std::lock_guard<std::mutex> lk(g_cache_mutex);
-            if (kvPageId < 0 || kvPageId >= (long)llama_model_n_layer(g_model)) {
-                return -1;
-            }
-            std::this_thread::sleep_for(std::chrono::milliseconds(6));
-            auto end = std::chrono::high_resolution_clock::now();
-            auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-            std::cout << "[llama_wrapper] offloadKv: kvPageId=" << kvPageId << " latency=" << latency.count() << "ms\n";
-            return latency.count();
+           auto start = std::chrono::high_resolution_clock::now();
+           std::lock_guard<std::mutex> lk(g_cache_mutex);
+            
+           if (kvPageId < 0 || kvPageId >= (long)llama_model_n_layer(g_model)) {
+               return -1;
+           }
+            
+           // Simulate offloading buffer (deallocate from device/memory)
+           // Remove from both RAM and GPU tracking
+           g_layer_allocated[kvPageId] = 0;
+            
+           // Latency is minimal for deallocation
+           std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            
+           auto end = std::chrono::high_resolution_clock::now();
+           auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+           std::cout << "[llama_wrapper] offloadKv: kvPageId=" << kvPageId << " latency=" << latency.count() << "ms\n";
+           return latency.count();
         }
 #endif
-        std::this_thread::sleep_for(std::chrono::milliseconds(6));
-        return 6;
+        // Fallback simulation
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        return 1;
     }
     static int lw_getCurrentLayer() { return 0; }
     static long lw_getGpuMemory() {
