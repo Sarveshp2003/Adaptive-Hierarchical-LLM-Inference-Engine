@@ -35,10 +35,10 @@ The Adaptive Hierarchical LLM Inference Engine with integrated AI scheduler is i
 ## Test Summary (latest local run)
 
 - Test: Phase2ProductionIntegrationTest (dry-run mode)
-- Decisions: 50
-- Success: 50/50
-- Loss: 2.026 → 0.051522 (after online incremental updates)
-- Notes: Integration test linked to local native shim (adaptive_engine.dll). Loader successfully found and loaded the real engine; fallback not used in final run.
+- Decisions: 50 (dry run), extended system-check: 1000 decisions
+- Success: 50/50 (dry run), 1000/1000 (system-check)
+- Loss: 2.026 → 0.051522 (dry run). Extended run loss converged to ~0.0011
+- Notes: Full system check executed locally using llama_wrapper scaffold; some calls fell back to MockNativeEngine intermittently during runs. CI updated to build both shim and llama_wrapper and run an extended system-check job.
 
 ## Next Steps (recommended)
 

@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class Phase2ProductionIntegrationTest {
 
     private static final int TOTAL_LAYERS = 28;
-    private static final int TEST_DECISION_COUNT = 50; // Reduced for dry run
+    private static final int TEST_DECISION_COUNT = Integer.getInteger("phase2.decisions", 50); // Configurable via -Dphase2.decisions
 
     public static void main(String[] args) {
         System.out.println("=== Phase 2: Production Integration Test ===");
