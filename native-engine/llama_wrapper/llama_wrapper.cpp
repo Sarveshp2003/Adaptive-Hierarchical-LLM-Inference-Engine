@@ -3,6 +3,11 @@
 #include <cstdlib>
 #include <iostream>
 
+#ifdef HAVE_LLAMA
+// When built with the llama submodule, include public headers here (optional)
+#include "llama.h"
+#endif
+
 extern "C" {
     typedef struct NativeEngineApi {
         void (*start)();

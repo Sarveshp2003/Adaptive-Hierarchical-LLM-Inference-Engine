@@ -28,7 +28,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake
+          sudo apt-get install -y build-essential cmake libopenblas-dev liblapack-dev libomp-dev
 
       - name: Install build deps (Windows)
         if: runner.os == 'Windows'
@@ -56,8 +56,12 @@ jobs:
           g++ -shared -fPIC -O2 -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -I"src/main/cpp/headers" -o lib/libadaptive_scheduler.so src/main/cpp/adaptive_scheduler.cpp -pthread || (echo "adaptive_scheduler build failed"; exit 1)
           echo "[COMPILE] Building adaptive_engine shim"
           g++ -shared -fPIC -O2 -o lib/libadaptive_engine.so native-engine/shim/adaptive_engine_shim.cpp -pthread || (echo "adaptive_engine_shim build failed"; exit 1)
-          echo "[COMPILE] Building llama_wrapper engine"
+          echo "[COMPILE] Building llama_wrapper engine (fast single-file build)"
           g++ -shared -fPIC -O2 -I"src/main/cpp/headers" -o lib/libadaptive_engine_llama.so native-engine/llama_wrapper/llama_wrapper.cpp -pthread || (echo "llama_wrapper build failed"; exit 1)
+          echo "[COMPILE] Attempting full llama.cpp CMake build (if submodule present)"
+          mkdir -p build/llama_build
+          cmake -S native-engine/llama_wrapper -B build/llama_build || echo "cmake configure failed"
+          cmake --build build/llama_build --target adaptive_engine_llama -- -j 2 || echo "cmake build failed"
           echo "[INFO] Built lib contents:" 
           ls -lah lib || true
 

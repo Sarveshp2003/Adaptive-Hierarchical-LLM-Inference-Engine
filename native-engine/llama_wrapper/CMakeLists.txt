@@ -11,6 +11,8 @@ if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/CMakeLists.txt")
     # Link against llama target provided by llama.cpp (llama) and ggml
     target_link_libraries(adaptive_engine_llama PRIVATE llama ggml::ggml)
     target_include_directories(adaptive_engine_llama PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/llama.cpp/include")
+    # Define HAVE_LLAMA for conditional compilation in the wrapper
+    target_compile_definitions(adaptive_engine_llama PRIVATE HAVE_LLAMA=1)
 else()
     add_library(adaptive_engine_llama SHARED llama_wrapper.cpp)
 endif()
