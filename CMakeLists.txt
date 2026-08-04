@@ -315,6 +315,44 @@ endif()
 
 add_subdirectory(native-engine)
 
+# ============================================================================
+# JNI Native Library (Phase 2.1)
+# ============================================================================
+# Find Java for JNI support
+find_package(Java REQUIRED)
+find_package(JNI REQUIRED)
+
+# Build the adaptive_scheduler JNI library
+add_library(adaptive_scheduler SHARED
+    src/main/cpp/adaptive_scheduler.cpp
+)
+
+# Link JNI libraries
+target_include_directories(adaptive_scheduler PRIVATE ${JNI_INCLUDE_DIRS})
+target_link_libraries(adaptive_scheduler PRIVATE)
+
+# Set output directory for the native library
+set_target_properties(adaptive_scheduler PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+)
+
+# Platform-specific settings
+if(MSVC)
+    set_target_properties(adaptive_scheduler PROPERTIES SUFFIX ".dll")
+    set_target_properties(adaptive_scheduler PROPERTIES PREFIX "")
+elseif(APPLE)
+    set_target_properties(adaptive_scheduler PROPERTIES SUFFIX ".dylib")
+    set_target_properties(adaptive_scheduler PROPERTIES PREFIX "lib")
+else()
+    set_target_properties(adaptive_scheduler PROPERTIES SUFFIX ".so")
+    set_target_properties(adaptive_scheduler PROPERTIES PREFIX "lib")
+endif()
+
+message(STATUS "Building Phase 2.1 JNI native library: adaptive_scheduler")
+message(STATUS "  JNI_INCLUDE_DIRS: ${JNI_INCLUDE_DIRS}")
+message(STATUS "  Output directory: ${CMAKE_BINARY_DIR}/lib")
+
 # Ensure runtime executables can find the GGML runtime DLLs when the native build outputs are available.
 foreach(tgt IN ITEMS run_sample_model runtime_contract_test gpu_backend_test generate_benchmark)
     if (TARGET ${tgt})
