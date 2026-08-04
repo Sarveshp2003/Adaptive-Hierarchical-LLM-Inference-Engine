@@ -130,6 +130,33 @@ static void* g_nativeHandle = nullptr;
 static void tryLoadNativeApi() {
     if (g_nativeApi) return;
     const char* candidates[] = { "adaptive_engine.dll", "native_engine.dll", "adaptive_scheduler_engine.dll" };
+
+    // First try loading engines from the same directory as this DLL (common when java.library.path is used)
+    HMODULE self = NULL;
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                           (LPCSTR)&tryLoadNativeApi, &self)) {
+        CHAR modulePath[MAX_PATH];
+        if (GetModuleFileNameA(self, modulePath, MAX_PATH)) {
+            std::string dir(modulePath);
+            auto pos = dir.find_last_of("\\/");
+            if (pos != std::string::npos) dir = dir.substr(0, pos+1);
+            else dir.clear();
+
+            for (auto name : candidates) {
+                std::string full = dir + name;
+                HMODULE h = LoadLibraryA(full.c_str());
+                if (!h) continue;
+                auto sym = (FARPROC)GetProcAddress(h, "adaptive_engine_get_api");
+                if (!sym) { FreeLibrary(h); continue; }
+                auto getApi = (GetApiFn)sym;
+                g_nativeApi = getApi();
+                if (g_nativeApi) { g_nativeHandle = (void*)h; std::cout << "[NativeLoader] Loaded native engine: " << full << "\n"; return; }
+                FreeLibrary(h);
+            }
+        }
+    }
+
+    // Fall back to system search paths
     for (auto name : candidates) {
         HMODULE h = LoadLibraryA(name);
         if (!h) continue;
@@ -140,6 +167,7 @@ static void tryLoadNativeApi() {
         if (g_nativeApi) { g_nativeHandle = (void*)h; std::cout << "[NativeLoader] Loaded native engine: " << name << "\n"; return; }
         FreeLibrary(h);
     }
+
     std::cout << "[NativeLoader] No native engine library found; falling back to MockNativeEngine\n";
 }
 #else
