@@ -71,12 +71,11 @@ The adaptive scheduler is now in Phase 2.1, with complete C++ JNI bridge impleme
   - ✅ Cross-platform build scripts (Windows/Linux/macOS)
   - ✅ Graceful fallback to mock engine when native library unavailable
 
-- **Phase 2.2 (real engine wiring)** ✅: Local real-engine wiring validated
-  - ✅ Built libadaptive_scheduler.dll and adaptive_engine.dll locally (MSVC); libraries present at E:\lib
-  - ✅ Loader updated to search the module directory and now successfully loads adaptive_engine.dll at runtime
-  - ✅ Ran Phase2ProductionIntegrationTest linked against local native shim; passed (50 decisions, loss 2.026 → 0.051522)
-  - ℹ️ Note: Small Java edits were made locally to enable testing; they remain uncommitted by request.
-  
+- **Phase 2.2 (llama_wrapper scaffold & CI build intent)** 🔧: Preparing llama_wrapper scaffold and CI-driven native builds
+  - 🔨 Added a lightweight `llama_wrapper` scaffold to host runtime bindings and simplify swapping MockNativeEngine → real engine.
+  - 🚧 CI intent: configure GitHub Actions to build native artifacts (libadaptive_scheduler, adaptive_engine) and upload them as artifacts for downstream integration testing.
+  - ℹ️ Local builds remain useful for rapid iteration; CI artifacts will enable reproducible Phase 2.2 integration tests.
+   
 - **Phase 3 Planned** ⏳: Distributed simulation on local machine
   - Multi-node scheduler simulation (5-50+ nodes)
   - Federated learning across simulated nodes

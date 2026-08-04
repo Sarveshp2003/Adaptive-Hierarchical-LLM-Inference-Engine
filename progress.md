@@ -52,7 +52,7 @@ The Adaptive Hierarchical LLM Inference Engine with integrated AI scheduler is i
 - Phase 2.1: COMPLETE (Java + JNI stubs + mock native) ✅
 - CI Build workflow: ADDED & PUSHED ✅
 - Native binary (local): BUILT at E:\lib (adaptive_scheduler.dll, adaptive_engine.dll) ✅
-- Phase 2.2 (real engine wiring): COMPLETE ✅ (local shim loaded and loader updated)
+- Phase 2.2 (llama_wrapper scaffold & CI build intent): IN PROGRESS 🔧 — added `llama_wrapper` scaffold and targeting CI-native artifact builds for integration tests
 
 ---
 

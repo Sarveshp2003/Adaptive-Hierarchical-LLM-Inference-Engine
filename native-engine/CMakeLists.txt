@@ -14,4 +14,7 @@ add_subdirectory(minirepro)
 # a simple mock implementation.
 add_subdirectory(shim)
 
+# Optionally build llama.cpp wrapper as a real-engine backend for Phase 2.2
+add_subdirectory(llama_wrapper)
+
 
