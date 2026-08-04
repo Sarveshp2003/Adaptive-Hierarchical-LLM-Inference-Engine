@@ -4,6 +4,9 @@
 #include <iostream>
 #include <vector>
 #include <mutex>
+#include <fstream>
+#include <errno.h>
+#include <cstring>
 
 #ifdef HAVE_LLAMA
 // When built with the llama submodule, include public headers here (optional)
@@ -40,6 +43,8 @@ extern "C" {
     static struct llama_model * g_model = nullptr;
     // Per-model cached layers bitmap and mutex to protect it
     static std::vector<char> g_layer_cached;
+    // Per-layer pin (refcount) to prevent eviction while in use
+    static std::vector<int> g_layer_refcount;
     static std::mutex g_cache_mutex;
 #endif
 
@@ -48,6 +53,14 @@ extern "C" {
         const char * path = getenv("LLAMA_MODEL_PATH");
         if (path && !g_model) {
             std::cout << "[llama_wrapper] attempting to load model: " << path << "\n";
+            // Verify file exists and is readable
+            std::ifstream f(path, std::ios::binary | std::ios::ate);
+            if (!f) {
+                std::cerr << "[llama_wrapper] cannot open model file: " << path << " errno=" << errno << " (" << strerror(errno) << ")\n";
+            } else {
+                auto sz = f.tellg(); f.close();
+                std::cout << "[llama_wrapper] model file size=" << sz << " bytes\n";
+            }
             struct llama_model_params mparams = llama_model_default_params();
             // Use default params; callers can customize via env or later API
             g_model = llama_model_load_from_file(path, mparams);
@@ -57,8 +70,9 @@ extern "C" {
                 int nlayer = llama_model_n_layer(g_model);
                 std::lock_guard<std::mutex> lk(g_cache_mutex);
                 g_layer_cached.assign(nlayer, 0);
+                g_layer_refcount.assign(nlayer, 0);
             } else {
-                std::cerr << "[llama_wrapper] failed to load model: " << path << "\n";
+                std::cerr << "[llama_wrapper] failed to load model: " << path << " -- llama_model_load_from_file returned NULL\n";
             }
         }
 #endif
@@ -87,6 +101,7 @@ extern "C" {
             // simulate prefetch cost and mark cached
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             g_layer_cached[layerId] = 1;
+            // do not modify refcount; prefetch brings layer into cache but does not pin it
             return 10;
         }
 #endif
@@ -99,6 +114,10 @@ extern "C" {
             std::lock_guard<std::mutex> lk(g_cache_mutex);
             if (layerId < 0 || layerId >= (int)g_layer_cached.size()) return -1;
             if (!g_layer_cached[layerId]) return 0; // already evicted
+            if (g_layer_refcount[layerId] > 0) {
+                std::cout << "[llama_wrapper] evict denied: layer " << layerId << " is pinned (refcount=" << g_layer_refcount[layerId] << ")\n";
+                return -2; // cannot evict while pinned
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
             g_layer_cached[layerId] = 0;
             return 2;
@@ -108,6 +127,18 @@ extern "C" {
         return 1;
     }
     static long lw_keepLayer(int layerId) {
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            std::lock_guard<std::mutex> lk(g_cache_mutex);
+            if (layerId < 0 || layerId >= (int)g_layer_cached.size()) return -1;
+            if (!g_layer_cached[layerId]) {
+                // bring into cache first
+                g_layer_cached[layerId] = 1;
+            }
+            ++g_layer_refcount[layerId];
+            return g_layer_refcount[layerId];
+        }
+#endif
         return 0;
     }
     static long lw_moveKvToRam(long kvPageId) {
@@ -196,7 +227,16 @@ extern "C" {
         &lw_getCachedLayers
     };
 
-    ADAPTIVE_ENGINE_EXPORT NativeEngineApi* adaptive_engine_get_api() {
+    ADAPTIVE_ENGINE_EXPORT     ADAPTIVE_ENGINE_EXPORT void adaptive_engine_test_release_layer(int layerId) {
+#ifdef HAVE_LLAMA
+        std::lock_guard<std::mutex> lk(g_cache_mutex);
+        if (layerId < 0 || layerId >= (int)g_layer_refcount.size()) return;
+        if (g_layer_refcount[layerId] > 0) --g_layer_refcount[layerId];
+        std::cout << "[llama_wrapper] test_release_layer: layer " << layerId << " new_refcount=" << g_layer_refcount[layerId] << "\n";
+#endif
+    }
+
+    NativeEngineApi* adaptive_engine_get_api() {
         return &g_llama_api;
     }
 }
