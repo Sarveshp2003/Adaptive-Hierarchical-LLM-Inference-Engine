@@ -433,6 +433,210 @@ extern "C" {
         &lw_getCachedLayers
     };
 
+    // ============ PHASE 5.3: TOKENIZATION & REAL INFERENCE ============
+
+    /**
+     * Tokenize a text string into token IDs
+     * Returns the number of tokens produced (or -1 on error)
+     * output_tokens will contain the token IDs
+     */
+    ADAPTIVE_ENGINE_EXPORT int adaptive_engine_tokenize(
+        const char* text,
+        int* output_tokens,
+        int max_tokens
+    ) {
+#ifdef HAVE_LLAMA
+        if (!g_model || !text || !output_tokens) return -1;
+        
+        std::vector<llama_token> tokens;
+        
+        // Tokenize the input text
+        tokens = llama_tokenize(g_model, text, true);
+        
+        if (tokens.empty()) {
+            std::cerr << "[llama_wrapper] tokenization produced no tokens for: " << text << "\n";
+            return 0;
+        }
+        
+        // Copy tokens to output buffer (up to max_tokens)
+        int count = std::min((int)tokens.size(), max_tokens);
+        for (int i = 0; i < count; i++) {
+            output_tokens[i] = tokens[i];
+        }
+        
+        std::cout << "[llama_wrapper] tokenized: \"" << text << "\" -> " << count << " tokens\n";
+        return count;
+#endif
+        return -1;
+    }
+
+    /**
+     * Detokenize token IDs back to text
+     * Writes to output_text buffer, returns number of bytes written
+     */
+    ADAPTIVE_ENGINE_EXPORT int adaptive_engine_detokenize(
+        int* tokens,
+        int token_count,
+        char* output_text,
+        int max_len
+    ) {
+#ifdef HAVE_LLAMA
+        if (!g_model || !tokens || !output_text) return -1;
+        
+        std::string result;
+        
+        // Detokenize each token
+        for (int i = 0; i < token_count; i++) {
+            std::string piece = llama_token_to_piece(g_model, tokens[i]);
+            result += piece;
+        }
+        
+        // Copy to output buffer
+        int len = std::min((int)result.length(), max_len - 1);
+        strncpy(output_text, result.c_str(), len);
+        output_text[len] = '\0';
+        
+        std::cout << "[llama_wrapper] detokenized " << token_count << " tokens -> " << len << " bytes\n";
+        return len;
+#endif
+        return -1;
+    }
+
+    /**
+     * Get vocabulary size
+     */
+    ADAPTIVE_ENGINE_EXPORT int adaptive_engine_get_vocab_size() {
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            return llama_model_n_vocab(g_model);
+        }
+#endif
+        return -1;
+    }
+
+    /**
+     * Run a single inference step with given tokens
+     * Returns the index of the predicted next token (or -1 on error)
+     * Also populates logits_out if provided
+     */
+    ADAPTIVE_ENGINE_EXPORT int adaptive_engine_infer(
+        int* input_tokens,
+        int token_count,
+        float* logits_out,
+        int max_logits
+    ) {
+#ifdef HAVE_LLAMA
+        if (!g_model || !g_context || !input_tokens) return -1;
+        
+        // Reset context KV cache for new inference
+        llama_kv_cache_clear(g_context);
+        
+        // Process input tokens
+        for (int i = 0; i < token_count; i++) {
+            if (llama_decode(g_context, llama_batch_get_one_token(input_tokens[i], i))) {
+                std::cerr << "[llama_wrapper] inference failed at token " << i << "\n";
+                return -1;
+            }
+        }
+        
+        // Get logits for next token prediction
+        float* logits = llama_get_logits_ith(g_context, token_count - 1);
+        if (!logits) {
+            std::cerr << "[llama_wrapper] failed to get logits\n";
+            return -1;
+        }
+        
+        int vocab_size = llama_model_n_vocab(g_model);
+        
+        // Copy logits to output buffer (up to max_logits)
+        if (logits_out) {
+            int copy_count = std::min(vocab_size, max_logits);
+            memcpy(logits_out, logits, copy_count * sizeof(float));
+        }
+        
+        // Find argmax for next token
+        int next_token = 0;
+        float max_logit = logits[0];
+        for (int i = 1; i < vocab_size; i++) {
+            if (logits[i] > max_logit) {
+                max_logit = logits[i];
+                next_token = i;
+            }
+        }
+        
+        std::cout << "[llama_wrapper] inference: " << token_count << " input tokens -> next_token=" << next_token 
+                  << " logit=" << max_logit << "\n";
+        return next_token;
+#endif
+        return -1;
+    }
+
+    /**
+     * Compute perplexity of a sequence
+     * Returns negative log likelihood (lower is better)
+     */
+    ADAPTIVE_ENGINE_EXPORT double adaptive_engine_compute_perplexity(
+        int* tokens,
+        int token_count
+    ) {
+#ifdef HAVE_LLAMA
+        if (!g_model || !g_context || !tokens || token_count < 1) return -1.0;
+        
+        llama_kv_cache_clear(g_context);
+        
+        double nll = 0.0;  // negative log likelihood
+        int predictions = 0;
+        
+        // Process tokens one by one, computing NLL for each prediction
+        for (int i = 0; i < token_count - 1; i++) {
+            // Predict next token given tokens[0..i]
+            if (llama_decode(g_context, llama_batch_get_one_token(tokens[i], i))) {
+                std::cerr << "[llama_wrapper] perplexity computation failed at token " << i << "\n";
+                return -1.0;
+            }
+            
+            float* logits = llama_get_logits_ith(g_context, i);
+            if (!logits) continue;
+            
+            int vocab_size = llama_model_n_vocab(g_model);
+            int target = tokens[i + 1];
+            
+            if (target < 0 || target >= vocab_size) continue;
+            
+            // Compute log softmax for target token
+            // For numerical stability, we use the standard trick:
+            // log(exp(logits[i]) / sum(exp(logits[j]))) = logits[i] - log(sum(exp(logits[j])))
+            
+            // Find max for numerical stability
+            float max_logit = logits[0];
+            for (int j = 1; j < vocab_size; j++) {
+                if (logits[j] > max_logit) max_logit = logits[j];
+            }
+            
+            // Compute log-sum-exp
+            float sum_exp = 0.0;
+            for (int j = 0; j < vocab_size; j++) {
+                sum_exp += exp(logits[j] - max_logit);
+            }
+            float log_sum_exp = log(sum_exp) + max_logit;
+            
+            // NLL for this token
+            float log_prob = logits[target] - log_sum_exp;
+            nll -= log_prob;  // Negative log likelihood
+            predictions++;
+        }
+        
+        // Return average NLL (perplexity-related metric)
+        if (predictions > 0) {
+            double avg_nll = nll / predictions;
+            std::cout << "[llama_wrapper] perplexity: " << token_count << " tokens, "
+                      << "predictions=" << predictions << ", avg_nll=" << avg_nll << "\n";
+            return avg_nll;
+        }
+#endif
+        return -1.0;
+    }
+
     ADAPTIVE_ENGINE_EXPORT void adaptive_engine_test_release_layer(int layerId) {
 #ifdef HAVE_LLAMA
         std::lock_guard<std::mutex> lk(g_cache_mutex);
