@@ -17,7 +17,23 @@ Phase 2: Native Engine Integration (COMPLETED)
 - Phase 2.1: JNI scaffolding and MockNativeEngine implementation
 - Phase 2.2: Real native wrapper (llama.cpp integration)
 
-Current Status: Phase 2.2 COMPLETE
+Current Status: Phase 2.2 COMPLETE → Phase 3.1 COMPLETE
+
+Phase 3: Native Engine Improvements (IN PROGRESS)
+- Phase 3.1: Real KV Buffer Tracking (COMPLETED)
+  - Created llama_context for proper KV cache management
+  - Implemented realistic latency simulation based on buffer sizes
+  - Per-layer buffer tracking (g_layer_buffer_sizes)
+  - Latency estimation: moveKvToRam (1GB/sec), moveKvToGpu (2GB/sec), compressKv (100MB/sec)
+  - All KV operations report realistic latencies (12-16ms range)
+  - All tests passing: 6/6 KV operation tests, pinned eviction, exports
+
+- Phase 3.4: Dynamic Layer Prioritization (IN PROGRESS)
+  - Created LayerPrioritizationLearner with policy gradient learning
+  - Per-layer metrics tracking: access frequency, convergence impact, eviction rate
+  - Adaptive prefetch depth based on workload characteristics
+  - Integration layer: AdaptiveLayerScheduler for closed-loop learning
+  - Periodic learning phases to update layer priority strategies
 
 Native Engine Implementation Details
 
