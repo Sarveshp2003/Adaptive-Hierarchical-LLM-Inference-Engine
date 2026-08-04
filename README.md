@@ -1,5 +1,12 @@
 # Adaptive Hierarchical LLM Inference Engine
 
+## Latest update (2026-08-04)
+- Real-engine integration completed locally: llama.cpp (ggml) was built via CMake and linked into the native wrapper. The adaptive_engine_get_api symbol is exported and verified.
+- Local model validation: with LLAMA_MODEL_PATH set to a local GGUF model, the native prefetch/evict unit test passed and Phase2ProductionIntegrationTest ran successfully (including an extended 1000-decision system check). Online learning is active and metrics are within expected ranges.
+- CI: a model-smoke job was added to GitHub Actions to exercise model-loaded flows when the LLAMA_MODEL_URL repository secret is provided. The job skips cleanly if the secret is not set.
+
+# Adaptive Hierarchical LLM Inference Engine
+
 This repository contains a prototype runtime for adaptive hierarchical LLM inference with:
 
 - GGUF-backed model probing and metadata inspection

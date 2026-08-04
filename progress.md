@@ -1,5 +1,12 @@
 # Progress Report
 
+## Latest update (2026-08-04)
+- Built and validated real-engine integration locally: llama.cpp and ggml were compiled and linked into native wrapper DLLs; adaptive_engine_get_api is exported and loadable by the Java native loader.
+- Model-loaded tests passed: native prefetch/evict unit test and Phase2ProductionIntegrationTest (including an extended 1000-decision run) completed successfully with a local GGUF model (LLAMA_MODEL_PATH set).
+- CI updated: added a model-smoke job that downloads a test GGUF when LLAMA_MODEL_URL secret is set; job skips automatically when the secret is absent. Other CI jobs remain unchanged.
+
+# Progress Report
+
 ## Project Status: Phase 2.1 Local Development ✅
 
 The Adaptive Hierarchical LLM Inference Engine with integrated AI scheduler is in **Phase 2.1: C++ JNI Native Implementation for Local Development**. Core scheduling, closed-loop learning and JVM↔native wiring are implemented. Recent CI workflow and native-shim updates were added to complete local build-and-test automation and prepare for Phase 2.2.
