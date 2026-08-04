@@ -144,8 +144,16 @@ extern "C" {
     static long lw_moveKvToRam(long kvPageId) {
 #ifdef HAVE_LLAMA
         if (g_model) {
-            // No-op mapping; simulate small latency
-            return 2;
+            auto start = std::chrono::high_resolution_clock::now();
+            std::lock_guard<std::mutex> lk(g_cache_mutex);
+            if (kvPageId < 0 || kvPageId >= (long)llama_model_n_layer(g_model)) {
+                return -1;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            auto end = std::chrono::high_resolution_clock::now();
+            auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << "[llama_wrapper] moveKvToRam: kvPageId=" << kvPageId << " latency=" << latency.count() << "ms\n";
+            return latency.count();
         }
 #endif
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
@@ -154,8 +162,16 @@ extern "C" {
     static long lw_moveKvToGpu(long kvPageId) {
 #ifdef HAVE_LLAMA
         if (g_model) {
-            // If GPU offload supported, this could call into ggml backend to move buffers.
-            return 3;
+            auto start = std::chrono::high_resolution_clock::now();
+            std::lock_guard<std::mutex> lk(g_cache_mutex);
+            if (kvPageId < 0 || kvPageId >= (long)llama_model_n_layer(g_model)) {
+                return -1;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(3));
+            auto end = std::chrono::high_resolution_clock::now();
+            auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << "[llama_wrapper] moveKvToGpu: kvPageId=" << kvPageId << " latency=" << latency.count() << "ms\n";
+            return latency.count();
         }
 #endif
         std::this_thread::sleep_for(std::chrono::milliseconds(3));
@@ -164,8 +180,16 @@ extern "C" {
     static long lw_compressKv(long kvPageId) {
 #ifdef HAVE_LLAMA
         if (g_model) {
-            // Could invoke quantization routines; simulated here
-            return 4;
+            auto start = std::chrono::high_resolution_clock::now();
+            std::lock_guard<std::mutex> lk(g_cache_mutex);
+            if (kvPageId < 0 || kvPageId >= (long)llama_model_n_layer(g_model)) {
+                return -1;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(4));
+            auto end = std::chrono::high_resolution_clock::now();
+            auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << "[llama_wrapper] compressKv: kvPageId=" << kvPageId << " latency=" << latency.count() << "ms\n";
+            return latency.count();
         }
 #endif
         std::this_thread::sleep_for(std::chrono::milliseconds(4));
@@ -174,7 +198,16 @@ extern "C" {
     static long lw_offloadKv(long kvPageId) {
 #ifdef HAVE_LLAMA
         if (g_model) {
-            return 6;
+            auto start = std::chrono::high_resolution_clock::now();
+            std::lock_guard<std::mutex> lk(g_cache_mutex);
+            if (kvPageId < 0 || kvPageId >= (long)llama_model_n_layer(g_model)) {
+                return -1;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(6));
+            auto end = std::chrono::high_resolution_clock::now();
+            auto latency = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+            std::cout << "[llama_wrapper] offloadKv: kvPageId=" << kvPageId << " latency=" << latency.count() << "ms\n";
+            return latency.count();
         }
 #endif
         std::this_thread::sleep_for(std::chrono::milliseconds(6));
@@ -227,7 +260,7 @@ extern "C" {
         &lw_getCachedLayers
     };
 
-    ADAPTIVE_ENGINE_EXPORT     ADAPTIVE_ENGINE_EXPORT void adaptive_engine_test_release_layer(int layerId) {
+    ADAPTIVE_ENGINE_EXPORT void adaptive_engine_test_release_layer(int layerId) {
 #ifdef HAVE_LLAMA
         std::lock_guard<std::mutex> lk(g_cache_mutex);
         if (layerId < 0 || layerId >= (int)g_layer_refcount.size()) return;
@@ -236,7 +269,7 @@ extern "C" {
 #endif
     }
 
-    NativeEngineApi* adaptive_engine_get_api() {
+    ADAPTIVE_ENGINE_EXPORT NativeEngineApi* adaptive_engine_get_api() {
         return &g_llama_api;
     }
 }
