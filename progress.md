@@ -2,8 +2,18 @@
 
 ## Latest update (2026-08-04)
 - Built and validated real-engine integration locally: llama.cpp and ggml were compiled and linked into native wrapper DLLs; adaptive_engine_get_api is exported and loadable by the Java native loader.
-- Model-loaded tests passed: native prefetch/evict unit test and Phase2ProductionIntegrationTest (including an extended 1000-decision run) completed successfully with a local GGUF model (LLAMA_MODEL_PATH set).
-- CI updated: added a model-smoke job that downloads a test GGUF when LLAMA_MODEL_URL secret is set; job skips automatically when the secret is absent. Other CI jobs remain unchanged.
+- Model-loaded tests passed locally: native prefetch/evict unit test and Phase2ProductionIntegrationTest (including an extended 1000-decision run) completed successfully when LLAMA_MODEL_PATH pointed to a local GGUF model.
+- Local-first testing policy adopted: all end-to-end, system-check, and model-loaded validation will be executed locally (developer machines or a designated local test host). The CI model-smoke job remains optional and will be skipped if no LLAMA_MODEL_URL secret is provided.
+
+Updated next steps (local-first)
+
+1. Ensure local toolchain is installed (Visual Studio Native Tools on Windows or g++/cmake on Linux) and that PATH includes built DLLs or runtime library locations.
+2. Run CMake build for native wrapper and dependent libs, deploy DLLs to E:\lib or add build outputs to PATH.
+3. Set LLAMA_MODEL_PATH to a local GGUF model and run Phase2ProductionIntegrationTest for end-to-end validation.
+4. Iterate on prefetch/evict mapping and add additional native unit tests to cover layer-level semantics.
+5. Keep CI as an artifact builder and dry-run validator; model-loaded tests are run locally before release.
+
+Maintainer notes: the project is ready for Phase 2.2 local development; replace the mock engine locally after native artifacts are built or a local toolchain is available.
 
 # Progress Report
 

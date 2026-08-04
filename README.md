@@ -1,9 +1,35 @@
 # Adaptive Hierarchical LLM Inference Engine
 
 ## Latest update (2026-08-04)
-- Real-engine integration completed locally: llama.cpp (ggml) was built via CMake and linked into the native wrapper. The adaptive_engine_get_api symbol is exported and verified.
+- Real-engine integration completed locally: llama.cpp and ggml were built via CMake and linked into the native wrapper. The adaptive_engine_get_api symbol is exported and verified.
 - Local model validation: with LLAMA_MODEL_PATH set to a local GGUF model, the native prefetch/evict unit test passed and Phase2ProductionIntegrationTest ran successfully (including an extended 1000-decision system check). Online learning is active and metrics are within expected ranges.
-- CI: a model-smoke job was added to GitHub Actions to exercise model-loaded flows when the LLAMA_MODEL_URL repository secret is provided. The job skips cleanly if the secret is not set.
+- Policy: Local-first testing and validation
+  - All end-to-end and system-check testing will be executed locally. CI remains available for build artifacts and dry-run checks, but model-loaded validation and extended system tests are performed on local developer machines or a designated local test host.
+  - The CI model-smoke job remains in the workflow for future use but is optional and will not be relied upon for routine model validation.
+
+Local run (example)
+
+1. Build the wrapper and dependent DLLs via CMake (example):
+
+```powershell
+cmake -S native-engine/llama_wrapper -B native-engine/llama_wrapper/build -A x64 -DCMAKE_BUILD_TYPE=Release
+cmake --build native-engine/llama_wrapper/build --config Release --target adaptive_engine_llama
+```
+
+2. Deploy built DLLs to a local lib directory or add the build output to PATH, then set LLAMA_MODEL_PATH and run the integration test:
+
+```powershell
+set LLAMA_MODEL_PATH=E:\AdaptiveLLMRuntime\models\Llama-3.2-3B-Instruct-f16.gguf
+java -Djava.library.path=E:\lib -cp bin com.adaptivellm.scheduler.Phase2ProductionIntegrationTest
+```
+
+3. For additional verification, run the native unit tests in native-engine/llama_wrapper/tests (prefetch/evict and export checks).
+
+Notes
+
+- Use a small GGUF test model for rapid iteration when possible. Large models will increase iteration time.
+- If local builds are performed on Windows, ensure Visual Studio Native Tools (vcvars64) is used; on Linux use the CMake flow shown above.
+- Update LLAMA_MODEL_PATH to the local model path before running tests.
 
 # Adaptive Hierarchical LLM Inference Engine
 
