@@ -97,6 +97,11 @@ public:
     }
 };
 
+// Shim accessor: return current native engine instance. Replaceable later with a dynamic loader that binds to a real NativeEngine.
+static MockNativeEngine* getNativeEngine() {
+    return MockNativeEngine::instance();
+}
+
 // ============================================================================
 // ProductionMemoryStateProvider JNI Methods
 // ============================================================================
