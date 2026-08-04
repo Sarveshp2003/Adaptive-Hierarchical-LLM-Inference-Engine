@@ -28,17 +28,57 @@ extern "C" {
     // A very small wrapper that provides a basic native engine implementation.
     // When llama.cpp or another engine is integrated, replace these with real calls.
 
+#ifdef HAVE_LLAMA
+    static struct llama_model * g_model = nullptr;
+#endif
+
     static void lw_start() {
-        std::cout << "[llama_wrapper] start()\\n";
+#ifdef HAVE_LLAMA
+        const char * path = getenv("LLAMA_MODEL_PATH");
+        if (path && !g_model) {
+            std::cout << "[llama_wrapper] attempting to load model: " << path << "\n";
+            struct llama_model_params mparams = llama_model_default_params();
+            // Use default params; callers can customize via env or later API
+            g_model = llama_model_load_from_file(path, mparams);
+            if (g_model) {
+                std::cout << "[llama_wrapper] loaded model: " << path << "\n";
+            } else {
+                std::cerr << "[llama_wrapper] failed to load model: " << path << "\n";
+            }
+        }
+#endif
+        std::cout << "[llama_wrapper] start()\n";
     }
+
     static void lw_stop() {
-        std::cout << "[llama_wrapper] stop()\\n";
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            llama_model_free(g_model);
+            g_model = nullptr;
+            std::cout << "[llama_wrapper] freed model\n";
+        }
+#endif
+        std::cout << "[llama_wrapper] stop()\n";
     }
+
     static long lw_prefetchLayer(int layerId) {
+#ifdef HAVE_LLAMA
+        // Prefetch could map to loading a layer into RAM; llama.cpp handles this internally when using llama_model_load_from_file.
+        if (g_model) {
+            // No-op for now, return small latency
+            return 5;
+        }
+#endif
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
         return 5;
     }
     static long lw_evictLayer(int layerId) {
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            // No direct API to evict a single layer; return simulated latency
+            return 1;
+        }
+#endif
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
         return 1;
     }
@@ -46,25 +86,71 @@ extern "C" {
         return 0;
     }
     static long lw_moveKvToRam(long kvPageId) {
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            // No-op mapping; simulate small latency
+            return 2;
+        }
+#endif
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
         return 2;
     }
     static long lw_moveKvToGpu(long kvPageId) {
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            // If GPU offload supported, this could call into ggml backend to move buffers.
+            return 3;
+        }
+#endif
         std::this_thread::sleep_for(std::chrono::milliseconds(3));
         return 3;
     }
     static long lw_compressKv(long kvPageId) {
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            // Could invoke quantization routines; simulated here
+            return 4;
+        }
+#endif
         std::this_thread::sleep_for(std::chrono::milliseconds(4));
         return 4;
     }
     static long lw_offloadKv(long kvPageId) {
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            return 6;
+        }
+#endif
         std::this_thread::sleep_for(std::chrono::milliseconds(6));
         return 6;
     }
     static int lw_getCurrentLayer() { return 0; }
-    static long lw_getGpuMemory() { return 2L * 1024 * 1024 * 1024; }
-    static int lw_getKvPages() { return 256; }
-    static int lw_getCachedLayers() { return 2; }
+    static long lw_getGpuMemory() {
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            // Return model size as proxy for GPU memory requirement
+            return (long) llama_model_size(g_model);
+        }
+#endif
+        return 2L * 1024 * 1024 * 1024;
+    }
+    static int lw_getKvPages() {
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            // No direct mapping; use number of model layers as proxy
+            return llama_model_n_layer(g_model);
+        }
+#endif
+        return 256;
+    }
+    static int lw_getCachedLayers() {
+#ifdef HAVE_LLAMA
+        if (g_model) {
+            return 2;
+        }
+#endif
+        return 2;
+    }
 
     static NativeEngineApi g_llama_api = {
         &lw_start,
