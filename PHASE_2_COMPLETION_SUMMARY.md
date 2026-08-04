@@ -122,35 +122,36 @@ Phase2NativeEngineAdapter (real operations)
 
 ---
 
-## Deployment Roadmap
+## Deployment Roadmap (Local Only)
 
-### Phase 2.1: Development (Week 1) 📍
+### Phase 2.1: Local Development (Week 1) 📍
 - [ ] Implement C++ JNI stubs with mock returns
-- [ ] Compile libadaptive_scheduler
-- [ ] Run Phase2ProductionIntegrationTest
-- [ ] Verify latency overhead < 1ms
+- [ ] Compile libadaptive_scheduler locally
+- [ ] Run Phase2ProductionIntegrationTest locally
+- [ ] Verify latency overhead < 1ms on local machine
 
-### Phase 2.2: Staging (Week 2-3)
-- [ ] Implement real NativeEngine calls
-- [ ] Deploy to staging cluster
-- [ ] Run canary test with 10 concurrent requests
-- [ ] Collect 100+ real execution samples
+### Phase 2.2: Local Integration Testing (Week 2)
+- [ ] Implement C++ native methods with mock behavior
+- [ ] Integrate with local Llama.cpp instance
+- [ ] Run integration tests on local machine
+- [ ] Collect 100+ local execution samples
 
-### Phase 2.3: Data Collection (Week 3-4)
-- [ ] Deploy to 5% production traffic
-- [ ] Collect 1000+ real samples
+### Phase 2.3: Local Data Collection (Week 2-3)
+- [ ] Run scheduler continuously on local machine
+- [ ] Collect 1000+ local execution samples
 - [ ] Monitor decision latency and success rates
 - [ ] Identify hyperparameter tuning opportunities
 
-### Phase 2.4: Optimization (Week 4-5)
-- [ ] Retrain model with real data
+### Phase 2.4: Local Optimization (Week 3-4)
+- [ ] Retrain model with collected samples
 - [ ] Tune learning rate and update frequency
-- [ ] A/B test against rule-based baseline
+- [ ] Compare against rule-based baseline locally
 
-### Phase 2.5: Full Rollout (Week 6)
-- [ ] Deploy to 100% production
-- [ ] Monitor continuously
-- [ ] Prepare Phase 3 rollout
+### Phase 2.5: Local Benchmarking (Week 4)
+- [ ] Run extended benchmarks on local machine
+- [ ] Profile memory and CPU usage
+- [ ] Optimize for local hardware
+- [ ] Generate comprehensive performance report
 
 ---
 
@@ -210,40 +211,31 @@ Phase2NativeEngineAdapter (real operations)
 3. Set up JNI build pipeline (CMake + gcc/clang)
 4. Test library loading with Phase2ProductionIntegrationTest
 
-### Short Term (Next 2 Weeks)
+### Short Term (Next 2 Weeks - Local)
 1. Implement C++ native methods with mock behavior
-2. Compile and link libadaptive_scheduler
-3. Deploy to staging environment
-4. Run canary tests with actual Llama model
+2. Compile and link libadaptive_scheduler locally
+3. Run integration tests on local machine
+4. Test with local Llama.cpp instance
 
-### Medium Term (Weeks 3-6)
-1. Collect real execution data
+### Medium Term (Weeks 3-4 - Local)
+1. Collect local execution data
 2. Analyze decision quality and latency
-3. Retrain model with real samples
-4. A/B test against baseline
-5. Prepare Phase 3 cloud-native orchestration
+3. Retrain model with collected samples
+4. Generate performance analysis report
+5. Prepare Phase 3 distributed simulation
 
 ---
 
 ## Resource Requirements
 
-### Development
+### Local Machine Setup
 - JDK 11+ (existing)
-- CMake 3.20+ (new)
 - C++ compiler: gcc/clang (new)
+- CMake 3.20+ (new)
 - JNI header files (standard)
-
-### Staging
-- Kubernetes cluster (1-5 nodes)
-- GPU nodes with 8GB+ VRAM
-- Llama.cpp runtime
-- Monitoring stack (Prometheus + Grafana)
-
-### Production
-- Kubernetes cluster (5-50+ nodes)
-- GPU infrastructure
-- Logging and observability stack
-- CI/CD pipeline for library updates
+- Llama.cpp compiled locally
+- 8GB+ RAM for compilation and testing
+- GPU optional (for faster testing)
 
 ---
 

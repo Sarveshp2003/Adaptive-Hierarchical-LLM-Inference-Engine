@@ -1,317 +1,243 @@
-# Phase 3: Cloud-Native Orchestration & Distributed Scheduling
+# Phase 3: Local Distributed Simulation & Advanced Testing
 
 **Status**: Planning  
-**Target Start**: After Phase 2 production deployment  
-**Objective**: Scale scheduler to multi-node clusters with Kubernetes orchestration
+**Target Start**: After Phase 2 local integration  
+**Objective**: Simulate distributed scheduling locally without Kubernetes  
+**Environment**: Local Machine Only (No Cloud/Kubernetes)
 
 ## Overview
 
-Phase 3 extends the single-node AI scheduler to a distributed, cloud-native system with:
-- **Multi-Node Coordination**: Scheduler decisions across cluster nodes
-- **Kubernetes Integration**: Native scheduler plugin and CRD support
-- **Federated Learning**: Aggregate model improvements across nodes
-- **Dynamic Resource Allocation**: Auto-scaling based on inference load
+Phase 3 extends the single-node AI scheduler to simulate distributed scheduling locally with:
+- **Multi-Node Simulation**: Simulate multiple scheduler instances on local machine
+- **Federated Learning**: Aggregate model improvements across simulated nodes
+- **Distributed Coordination**: Local message passing between scheduler instances
+- **Advanced Testing**: Stress testing and performance analysis
+- **Data Analysis**: Comprehensive metrics collection and reporting
 
-## High-Level Architecture
+## High-Level Architecture (Local Simulation)
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                 Kubernetes Master                       │
+│                   Local Orchestrator                    │
 │  ┌──────────────────────────────────────────────────┐   │
-│  │  Adaptive Scheduler Controller (CRD)             │   │
-│  │  - Monitor PodMemoryState resources              │   │
-│  │  - Orchestrate decision propagation              │   │
-│  │  - Aggregate metrics from worker nodes           │   │
+│  │  Distributed Scheduler Simulator (Multi-threaded)│   │
+│  │  - Simulate multiple scheduler instances         │   │
+│  │  - Aggregate metrics from simulated nodes        │   │
+│  │  - Coordinate decisions across instances         │   │
 │  └──────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────┘
          │              │              │
-         │              │              │
-┌────────▼────┐  ┌──────▼──────┐  ┌───▼───────────┐
-│  Worker 1   │  │  Worker 2   │  │  Worker N     │
-│ ┌─────────┐ │  │ ┌─────────┐ │  │ ┌─────────┐   │
-│ │ Phase2  │ │  │ │ Phase2  │ │  │ │ Phase2  │   │
-│ │Adapter+ │ │  │ │Adapter+ │ │  │ │Adapter+ │   │
-│ │Scheduler│ │  │ │Scheduler│ │  │ │Scheduler│   │
-│ └─────────┘ │  │ └─────────┘ │  │ └─────────┘   │
-│             │  │             │  │               │
-└─────────────┘  └─────────────┘  └───────────────┘
+         │ (local IPC)  │              │
+         ▼              ▼              ▼
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  Simulator 1 │  │  Simulator 2 │  │  Simulator N │
+│ ┌──────────┐ │  │ ┌──────────┐ │  │ ┌──────────┐ │
+│ │ Phase2   │ │  │ │ Phase2   │ │  │ │ Phase2   │ │
+│ │Adapter + │ │  │ │Adapter + │ │  │ │Adapter + │ │
+│ │Scheduler │ │  │ │Scheduler │ │  │ │Scheduler │ │
+│ └──────────┘ │  │ └──────────┘ │  │ └──────────┘ │
+│ (Thread 1)   │  │ (Thread 2)   │  │ (Thread N)   │
+└──────────────┘  └──────────────┘  └──────────────┘
 ```
 
-## Key Components
+## Key Components (Local Simulation)
 
-### 1. Kubernetes Custom Resource Definition (CRD)
+### 1. Distributed Scheduler Simulator
 **Status**: To Be Implemented  
-**Purpose**: Define PodMemoryState as native K8s resource
+**Purpose**: Simulate multiple scheduler instances on local machine
 
-```yaml
-apiVersion: adaptivellm.io/v1alpha1
-kind: PodMemoryState
-metadata:
-  name: inference-pod-1
-  namespace: llm-workloads
-spec:
-  podRef:
-    name: llama-inference-1
-    namespace: default
-  modelLayers: 28
-  gpuMemoryMb: 8192
-  ramMemoryMb: 16384
-status:
-  currentLayer: 12
-  gpuUtilization: 0.75
-  ramUtilization: 0.80
-  lastDecision: PREFETCH_LAYER
-  lastDecisionTime: "2024-08-04T10:15:00Z"
-```
-
-### 2. Adaptive Scheduler Controller
-**Status**: To Be Implemented  
-**Purpose**: K8s operator managing distributed scheduling
-
-#### Controller Responsibilities
-- Watch PodMemoryState resources
-- Collect memory metrics from worker nodes
-- Run global optimization across cluster
-- Apply decisions to individual pods
-- Aggregate training samples for federated learning
-
-#### Key Methods
 ```java
-public class AdaptiveSchedulerController {
-    public void watchPodMemoryStates();
-    public void orchestrateDecisions(List<PodMemoryState> states);
-    public void applyDecisionToPod(Pod pod, Decision decision);
-    public void aggregateMetrics(List<MemoryMetrics> metrics);
-    public void triggerFederatedRetraining();
+public class DistributedSchedulerSimulator {
+    private List<SchedulerInstance> instances;
+    private LocalOrchestrator orchestrator;
+    
+    public void simulateMultiNode(int nodeCount);
+    public void coordinateDecisions();
+    public void aggregateMetrics();
+    public void runFederatedRetraining();
+}
+```
+
+### 2. Local Message Passing (IPC)
+**Status**: To Be Implemented  
+**Purpose**: Inter-process communication between scheduler instances via queues/sockets
+
+```java
+public class LocalMessageBus {
+    public void publish(SchedulerMessage message);
+    public SchedulerMessage consume(int nodeId);
+    public void broadcast(SchedulerMessage message);
 }
 ```
 
 ### 3. Federated Learning Engine
 **Status**: To Be Implemented  
-**Purpose**: Train global model on aggregated cluster data
+**Purpose**: Train global model on aggregated local data
 
-#### Training Strategy
 ```
-┌─────────────────────┐
-│ Each Worker Node    │
-│ ┌───────────────┐   │
-│ │ 100 samples   │   │
-│ │ Local loss: X │   │
-│ └───────────────┘   │
-└──────────┬──────────┘
-           │
-           │ (send samples)
-           ▼
-┌─────────────────────┐
-│ Master Node         │
-│ ┌───────────────┐   │
-│ │ 10K samples   │   │
-│ │ Global model  │   │
-│ │ Retrain (5s)  │   │
-│ └───────────────┘   │
-│                     │
-│ ┌───────────────┐   │
-│ │ New weights   │   │
-│ │ Broadcast     │   │
-│ └───────────────┘   │
-└──────────┬──────────┘
-           │
-           │ (broadcast)
-           ▼
-┌─────────────────────┐
-│ Each Worker Node    │
-│ ┌───────────────┐   │
-│ │ Update model  │   │
-│ │ New loss: Y   │   │
-│ └───────────────┘   │
-└─────────────────────┘
+Node 1: Train on 100 samples → Update 1
+Node 2: Train on 100 samples → Update 2
+Node 3: Train on 100 samples → Update 3
+         ↓
+    Aggregate Updates
+         ↓
+   Master Model Retrain
+         ↓
+  Broadcast to all nodes
 ```
 
-### 4. Distributed Memory State Provider
+### 4. Local Data Aggregator
 **Status**: To Be Implemented  
-**Purpose**: Fetch metrics from multiple nodes with gossip protocol
+**Purpose**: Collect and aggregate metrics from all simulated nodes
 
 ```java
-public class DistributedMemoryStateProvider {
-    // Gossip-based metric distribution
-    public void publishMetrics(MemoryState state);
-    
-    // Aggregate view of cluster state
-    public ClusterMemoryState getAggregateState();
-    
-    // Per-node state
-    public Map<String, MemoryState> getNodeStates();
+public class LocalDataAggregator {
+    public void collectMetrics(int nodeId, NodeMetrics metrics);
+    public AggregatedMetrics getGlobalMetrics();
+    public void exportMetricsReport(String filepath);
 }
 ```
 
-## Implementation Timeline
+## Implementation Timeline (Local)
 
-### Phase 3.1: CRD & Controller Scaffolding (Week 1)
-- [ ] Design and implement PodMemoryState CRD
-- [ ] Create AdaptiveSchedulerController base class
-- [ ] Implement Kubernetes watch on PodMemoryState
-- [ ] Set up test environment with minikube
+### Phase 3.1: Multi-Node Simulator Scaffolding (Week 1)
+- [ ] Design DistributedSchedulerSimulator
+- [ ] Implement LocalMessageBus for IPC
+- [ ] Create multi-threaded scheduler instances
+- [ ] Test basic message passing locally
 
-### Phase 3.2: Single-Node Integration (Week 2)
-- [ ] Integrate Phase 2 adapter with controller
-- [ ] Test decision application via kubectl
-- [ ] Implement Pod status update mechanism
-- [ ] Validate end-to-end decision pipeline
+### Phase 3.2: Single Node Integration (Week 2)
+- [ ] Integrate Phase 2 adapter with simulator
+- [ ] Test decision coordination between instances
+- [ ] Implement local metrics aggregation
+- [ ] Validate end-to-end multi-node pipeline
 
-### Phase 3.3: Multi-Node Coordination (Week 3)
-- [ ] Implement gossip protocol for metric distribution
-- [ ] Test metric aggregation across 5-node cluster
-- [ ] Implement global decision orchestration
-- [ ] Monitor cross-node latency
-
-### Phase 3.4: Federated Learning (Week 4)
-- [ ] Implement federated sample collection
+### Phase 3.3: Federated Learning (Week 3)
+- [ ] Implement federated sample collection locally
 - [ ] Create distributed retraining pipeline
-- [ ] Broadcast model updates to all workers
-- [ ] Validate loss convergence across cluster
+- [ ] Broadcast model updates between simulators
+- [ ] Validate loss convergence
 
-### Phase 3.5: Auto-Scaling & Optimization (Week 5)
-- [ ] Implement auto-scaling based on inference load
-- [ ] Create performance dashboard
-- [ ] Tune coordination overhead
-- [ ] Production readiness review
+### Phase 3.4: Performance Analysis (Week 4)
+- [ ] Run stress tests with 10+ simulated nodes
+- [ ] Analyze decision latency and coordination overhead
+- [ ] Optimize message passing efficiency
+- [ ] Generate performance report
 
-## Deployment Architecture
+### Phase 3.5: Advanced Testing & Benchmarking (Week 5)
+- [ ] Chaos testing (simulate node failures)
+- [ ] Long-running stability tests
+- [ ] Memory usage profiling
+- [ ] Final benchmarking and documentation
 
-### Kubernetes Manifests
-```yaml
-# 1. CRD Definition
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: podmemorystates.adaptivellm.io
-spec:
-  group: adaptivellm.io
-  names:
-    kind: PodMemoryState
-    plural: podmemorystates
+## Deployment Architecture (Local Machine)
 
-# 2. Controller Deployment
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: adaptive-scheduler-controller
-  namespace: adaptivellm-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: adaptive-scheduler-controller
-  template:
-    metadata:
-      labels:
-        app: adaptive-scheduler-controller
-    spec:
-      serviceAccountName: adaptive-scheduler-controller
-      containers:
-      - name: controller
-        image: gcr.io/adaptivellm/scheduler-controller:v1.0
-        env:
-        - name: WATCH_NAMESPACE
-          value: ""
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-
-# 3. RBAC
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: adaptive-scheduler-controller
-  namespace: adaptivellm-system
-
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: adaptive-scheduler-controller
-rules:
-- apiGroups: ["adaptivellm.io"]
-  resources: ["podmemorystates"]
-  verbs: ["get", "list", "watch", "create", "update"]
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["nodes"]
-  verbs: ["get", "list"]
+### Local Setup
+```
+~/.adaptivellm/
+├── scheduler-jars/
+│   ├── phase2-adapter.jar
+│   ├── simulator.jar
+│   └── metrics-collector.jar
+├── native-libs/
+│   ├── libadaptive_scheduler.so    (Linux)
+│   └── adaptive_scheduler.dll      (Windows)
+├── config/
+│   ├── simulator-config.yaml
+│   ├── federated-learning-config.yaml
+│   └── benchmark-config.yaml
+├── data/
+│   ├── training-samples/
+│   ├── metrics-logs/
+│   └── reports/
+└── scripts/
+    ├── run-simulator.sh
+    ├── run-benchmarks.sh
+    └── analyze-results.sh
 ```
 
-## Scaling Strategy
+### Running Locally
+```bash
+# Single-node baseline
+java -Djava.library.path=./native-libs \
+     -cp phase2-adapter.jar:simulator.jar \
+     com.adaptivellm.scheduler.Phase2ProductionIntegrationTest
 
-### Cluster Size Benchmarks
-| Nodes | Decisions/sec | Aggregation Latency | Training Samples/hour |
-|-------|---------------|---------------------|------------------------|
-| 1     | 100           | <1ms                | 3600                   |
-| 5     | 400           | <10ms               | 18000                  |
-| 10    | 800           | <20ms               | 36000                  |
-| 50    | 4000          | <50ms               | 180000                 |
+# Multi-node simulation (5 nodes)
+java -Djava.library.path=./native-libs \
+     -cp simulator.jar \
+     com.adaptivellm.scheduler.DistributedSchedulerSimulator \
+     --nodes 5 \
+     --duration 300 \
+     --output-dir ./data/results
+```
 
-### Bottleneck Analysis
-- **Decision Latency**: Network RTT across nodes (target: <50ms)
+## Scaling Strategy (Local Testing)
+
+### Local Simulation Benchmarks
+| Nodes (Simulated) | Decisions/sec | Decision Latency | Memory Usage | Duration |
+|-------------------|---------------|------------------|--------------|----------|
+| 1                 | 100           | <5ms             | 500MB        | 10 min   |
+| 5                 | 450           | <10ms            | 1.5GB        | 30 min   |
+| 10                | 800           | <15ms            | 2.5GB        | 1 hour   |
+| 50                | 3000          | <30ms            | 8GB          | 4 hours  |
+
+### Bottleneck Analysis (Local Machine)
+- **Message Passing Overhead**: Local IPC latency (target: <1ms)
 - **Model Synchronization**: Broadcast overhead (target: <5s per cycle)
-- **Metric Aggregation**: Gossip protocol efficiency (target: 99% accuracy)
+- **Metrics Aggregation**: Local queue efficiency (target: 99% accuracy)
+- **CPU/Memory Constraints**: Single machine limits (monitor peaks)
 
-## Monitoring & Observability
+## Monitoring & Observability (Local)
 
-### Key Metrics (Phase 3)
-- **Cross-Node Latency**: Decision propagation time
+### Key Metrics (Phase 3 Local)
+- **Simulator Decision Latency**: Decision time per node (target: <10ms)
+- **Message Passing Overhead**: IPC latency between nodes
 - **Federated Learning Efficiency**: Model loss per training cycle
-- **Cluster Utilization**: GPU/memory across all nodes
-- **Controller Health**: CRD watch latency, sync failures
+- **Memory Usage**: Peak and average per simulated node
+- **CPU Utilization**: Bottleneck identification
 
-### Observability Stack
-```yaml
-# Prometheus ServiceMonitor
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: adaptive-scheduler
-spec:
-  selector:
-    matchLabels:
-      app: adaptive-scheduler-controller
-  endpoints:
-  - port: metrics
-    interval: 30s
-
-# Grafana Dashboard
-- Title: "Adaptive Scheduler - Cluster Overview"
-  Panels:
-  - Decision latency p50/p95/p99
-  - Model loss convergence
-  - GPU utilization per node
-  - Network throughput between nodes
+### Local Logging
+```
+[DistributedSimulator] Node-1: Decision=PREFETCH_LAYER latency=3ms
+[DistributedSimulator] Node-2: Decision=MOVE_KV_TO_RAM latency=5ms
+[LocalMessageBus] Broadcast model update to 5 nodes (5.2ms)
+[FederatedLearningEngine] Aggregated 500 samples, new loss=0.0015
+[LocalDataAggregator] Memory: avg=1.8GB, peak=2.3GB
 ```
 
-## Production Readiness Checklist
+### Local Reports (Exported)
+- `simulator_results_[date].csv` - Decision metrics per node
+- `latency_distribution.json` - Histogram of all latencies
+- `learning_convergence.png` - Model loss over time
+- `resource_usage_report.txt` - Memory and CPU peaks
+- `performance_analysis.md` - Summary and recommendations
+
+## Local Development Checklist
 
 ### Code Quality
-- [ ] Unit tests for all CRD operations
-- [ ] Integration tests with etcd
-- [ ] Load tests for 50+ node clusters
-- [ ] Chaos engineering tests (node failures)
+- [ ] Unit tests for all simulator components
+- [ ] Integration tests for message passing
+- [ ] Stress tests for 50+ simulated nodes
+- [ ] Chaos testing (simulate node failures/crashes)
 
-### Deployment
-- [ ] Helm chart for easy installation
-- [ ] Upgrade strategy (zero-downtime rolling)
-- [ ] Backup/restore procedures for controller state
-- [ ] Health check endpoints
+### Testing
+- [ ] Multi-node baseline tests pass locally
+- [ ] Federated learning converges correctly
+- [ ] Metrics aggregation is accurate
+- [ ] Memory/CPU constraints handled gracefully
 
-### Operations
-- [ ] Runbook for common issues
-- [ ] Alert rules for critical failures
-- [ ] Capacity planning guide
-- [ ] Cost analysis for cloud deployment
+### Documentation
+- [ ] Local setup guide (Windows/Linux/Mac)
+- [ ] Troubleshooting guide for common issues
+- [ ] Performance tuning recommendations
+- [ ] API documentation for simulator components
+
+### Benchmarking
+- [ ] Complete performance report generated
+- [ ] Bottleneck analysis documented
+- [ ] Comparison against single-node baseline
+- [ ] Scaling recommendations provided
 
 ## Post-Phase-3 Roadmap
 
@@ -327,48 +253,59 @@ spec:
 - Theoretical performance bounds
 - Open-source contribution plan
 
-## File Structure (Phase 3)
+## File Structure (Phase 3 Local)
 
 ```
 src/main/java/com/adaptivellm/
-├── kubernetes/
-│   ├── AdaptiveSchedulerController.java (new)
-│   ├── PodMemoryStateWatch.java (new)
-│   └── KubernetesIntegration.java (new)
-├── distributed/
-│   ├── DistributedMemoryStateProvider.java (new)
-│   ├── GossipProtocol.java (new)
-│   └── ClusterCoordinator.java (new)
+├── simulator/
+│   ├── DistributedSchedulerSimulator.java (new)
+│   ├── SchedulerInstance.java (new)
+│   ├── LocalOrchestrator.java (new)
+│   └── SimulationConfig.java (new)
+├── messaging/
+│   ├── LocalMessageBus.java (new)
+│   ├── SchedulerMessage.java (new)
+│   └── MessageQueueImpl.java (new)
 ├── learning/
 │   ├── FederatedLearningEngine.java (new)
 │   └── AggregatedTrainingData.java (new)
+├── analysis/
+│   ├── LocalDataAggregator.java (new)
+│   ├── MetricsCollector.java (new)
+│   ├── PerformanceReporter.java (new)
+│   └── BenchmarkAnalyzer.java (new)
 └── scheduler/
     └── (existing Phase 1-2 files)
 
-k8s/
-├── crd/
-│   └── podmemorystate-crd.yaml (new)
-├── controller/
-│   ├── deployment.yaml (new)
-│   ├── rbac.yaml (new)
-│   └── service.yaml (new)
-└── monitoring/
-    ├── servicemonitor.yaml (new)
-    └── grafana-dashboard.json (new)
+tests/
+├── simulator/
+│   ├── DistributedSimulatorTest.java (new)
+│   ├── MessagePassingTest.java (new)
+│   └── FederatedLearningTest.java (new)
+└── benchmarks/
+    ├── LocalLatencyBenchmark.java (new)
+    └── ScalingBenchmark.java (new)
+
+data/
+├── config/
+│   └── simulator-config.yaml (new)
+└── results/
+    └── (generated performance reports)
 ```
 
 ## Success Criteria
 
-- [ ] Scheduler running on 5-node Kubernetes cluster
-- [ ] Cross-node decision latency < 50ms
+- [ ] Multi-node simulator running locally with 5-10 nodes
+- [ ] Decision coordination latency < 50ms locally
 - [ ] Federated model improves by 5% over single-node
-- [ ] Zero performance degradation from coordination overhead
-- [ ] All tests passing (unit, integration, load, chaos)
-- [ ] Production deployment on cloud provider
+- [ ] Zero crashes or deadlocks during 4-hour test run
+- [ ] All tests passing (unit, integration, stress, chaos)
+- [ ] Complete performance report and analysis generated
+- [ ] Scaling recommendations documented
 
 ---
 
-**Phase 3 Owner**: Cloud Infrastructure Lead  
-**Expected Completion**: 6 weeks  
-**Milestone Reviews**: Weekly standups, phase gate at end of each week  
-**Escalation**: Architecture review board
+**Phase 3 Owner**: Local Development Team  
+**Expected Completion**: 5 weeks  
+**Milestone Reviews**: Weekly standups  
+**Environment**: Local Machine Only (No Cloud/Kubernetes)

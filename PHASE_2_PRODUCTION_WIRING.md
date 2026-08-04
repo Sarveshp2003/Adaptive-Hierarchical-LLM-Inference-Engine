@@ -1,8 +1,9 @@
-# Phase 2: Production Wiring Guide
+# Phase 2: Production Wiring Guide (Local Development)
 
 **Status**: In Development  
 **Last Updated**: 2024  
-**Target Completion**: Production Deployment
+**Target Completion**: Local Integration & Testing  
+**Environment**: Local Machine Only (No Cloud/Production)
 
 ## Overview
 
@@ -118,61 +119,67 @@ make
 java -Djava.library.path=/path/to/native/libs MainClass
 ```
 
-## Integration Steps
+## Integration Steps (Local Development)
 
-### Phase 2.1: Development Environment (Week 1)
+### Phase 2.1: Local Development Environment (Week 1) 📍
 - [ ] Implement C++ JNI stubs with mock returns
-- [ ] Compile libadaptive_scheduler with mock implementations
-- [ ] Run Phase2ProductionIntegrationTest
-- [ ] Verify latency overhead < 1ms
+- [ ] Compile libadaptive_scheduler locally
+- [ ] Run Phase2ProductionIntegrationTest locally
+- [ ] Verify latency overhead < 1ms on local machine
 
-### Phase 2.2: Staging Deployment (Week 2-3)
-- [ ] Implement C++ native methods with real NativeEngine calls
-- [ ] Deploy to staging cluster with actual Llama model
-- [ ] Run canary test (10 concurrent requests)
-- [ ] Collect 100+ real execution samples
+### Phase 2.2: Local Testing (Week 2)
+- [ ] Implement C++ native methods with mock NativeEngine
+- [ ] Test with local Llama.cpp instance
+- [ ] Run integration tests locally
+- [ ] Collect 100+ local execution samples
 
-### Phase 2.3: Data Collection (Week 3-4)
-- [ ] Deploy to production subset (5% traffic)
-- [ ] Collect 1000+ real execution samples
-- [ ] Monitor decision latency, success rates, memory savings
+### Phase 2.3: Local Data Collection (Week 2-3)
+- [ ] Run scheduler continuously on local machine
+- [ ] Collect 1000+ local execution samples
+- [ ] Monitor decision latency and success rates
 - [ ] Identify hyperparameter tuning opportunities
 
-### Phase 2.4: Optimization (Week 4-5)
+### Phase 2.4: Local Optimization (Week 3-4)
 - [ ] Analyze collected data for failure modes
-- [ ] Retrain model with real data samples
+- [ ] Retrain model with collected samples
 - [ ] Tune learning rate, update frequency, action weights
-- [ ] A/B test against rule-based baseline
+- [ ] Compare against rule-based baseline locally
 
-### Phase 2.5: Full Rollout (Week 6)
-- [ ] Deploy to 100% production traffic
-- [ ] Monitor production metrics continuously
-- [ ] Collect ongoing feedback samples for continuous learning
-- [ ] Prepare Phase 3: Cloud-Native Orchestration
+### Phase 2.5: Local Benchmarking (Week 4)
+- [ ] Run extended benchmarks on local machine
+- [ ] Profile memory and CPU usage
+- [ ] Optimize for local hardware
+- [ ] Generate performance report
 
-## Deployment Checklist
+## Deployment Checklist (Local Machine)
 
-### Pre-Deployment
-- [ ] C++ JNI methods implemented and tested
-- [ ] libadaptive_scheduler compiled and signed
+### Pre-Development
+- [ ] C++ compiler installed (gcc/clang)
+- [ ] CMake 3.20+ installed
+- [ ] Java JDK 11+ installed
+- [ ] Llama.cpp compiled locally
+- [ ] JNI header files available
+
+### Local Development
+- [ ] C++ JNI methods implemented locally
+- [ ] libadaptive_scheduler compiled and available
 - [ ] Java classes compiled with Phase 2 adapters
 - [ ] ProductionMemoryStateProvider tested with mock engine
 - [ ] Phase2NativeEngineAdapter latency < 2ms
-- [ ] Error handling for native library unavailability
 
-### Deployment
-- [ ] Deploy libadaptive_scheduler to all nodes
-- [ ] Update java.library.path in production config
-- [ ] Run Phase2ProductionIntegrationTest in staging
-- [ ] Monitor startup logs for native library loading
-- [ ] Verify first 100 decisions with real metrics
+### Local Testing
+- [ ] Phase2ProductionIntegrationTest passes locally
+- [ ] Native library loads without errors
+- [ ] First 100 decisions work correctly
+- [ ] Metrics collection validated
+- [ ] Error handling verified
 
-### Post-Deployment
-- [ ] Monitor average decision latency (target: <10ms)
-- [ ] Monitor native call success rates (target: >99%)
-- [ ] Collect execution samples every 100 decisions
-- [ ] Run batch retraining on real data weekly
-- [ ] Compare against baseline in A/B testing
+### Post-Local Development
+- [ ] Performance benchmarks completed
+- [ ] Sample data collected and analyzed
+- [ ] Model retraining completed
+- [ ] Baseline comparison done
+- [ ] Documentation updated
 
 ## Error Handling Strategy
 
