@@ -291,4 +291,134 @@ public final class MLTrainer {
 
         return distribution;
     }
+
+    /**
+     * Feedback loop: retrain on execution results with outcome weighting.
+     * 
+     * Called after scheduler makes decisions and executes them, with metrics
+     * on how well those decisions performed (latency improvement, memory saved).
+     */
+    public void retrainWithFeedback(List<TrainingSample> samplesWithOutcomes) {
+        if (samplesWithOutcomes.isEmpty()) {
+            System.err.println("No samples with outcomes for retraining");
+            return;
+        }
+
+        System.out.println("\n╔════════════════════════════════════════════════════════════╗");
+        System.out.println("║         FEEDBACK-DRIVEN RETRAINING                        ║");
+        System.out.println("╚════════════════════════════════════════════════════════════╝\n");
+
+        // Collect outcome statistics
+        double avgLatencyImprovement = 0.0;
+        double avgMemorySaved = 0.0;
+        int samplesWithGoodOutcome = 0;
+
+        for (TrainingSample sample : samplesWithOutcomes) {
+            avgLatencyImprovement += sample.latencyImprovement();
+            avgMemorySaved += sample.memorySavedBytes();
+            if (sample.latencyImprovement() > 0) {
+                samplesWithGoodOutcome++;
+            }
+        }
+
+        avgLatencyImprovement /= samplesWithOutcomes.size();
+        avgMemorySaved /= samplesWithOutcomes.size();
+
+        System.out.println("Outcome Statistics:");
+        System.out.println(String.format("  Avg Latency Improvement: %.4f ms", avgLatencyImprovement));
+        System.out.println(String.format("  Avg Memory Saved: %.2f MB", avgMemorySaved / (1024.0 * 1024.0)));
+        System.out.println(String.format("  Good Decisions: %d / %d (%.1f%%)",
+            samplesWithGoodOutcome, samplesWithOutcomes.size(),
+            (samplesWithGoodOutcome * 100.0) / samplesWithOutcomes.size()));
+
+        // Retrain with outcome weighting
+        model.trainWeighted(samplesWithOutcomes, true);
+
+        // Update training data
+        if (trainingData == null) {
+            trainingData = new ArrayList<>();
+        }
+        trainingData.addAll(samplesWithOutcomes);
+
+        // Re-evaluate
+        evaluate();
+
+        performanceMetrics.put("avg_latency_improvement", avgLatencyImprovement);
+        performanceMetrics.put("avg_memory_saved", avgMemorySaved);
+        performanceMetrics.put("good_decision_ratio", (double) samplesWithGoodOutcome / samplesWithOutcomes.size());
+    }
+
+    /**
+     * Online learning: incrementally adapt to a single execution result.
+     * 
+     * Called immediately after each scheduler decision is executed to provide
+     * real-time feedback and improve decision quality.
+     */
+    public void updateWithExecutionResult(TrainingSample sample, int trainingIterations) {
+        System.out.println("\n[Online Learning] Adapting to execution result:");
+        System.out.println(String.format("  Action: %s", sample.decision().action()));
+        System.out.println(String.format("  Latency Improvement: %.4f ms", sample.latencyImprovement()));
+        System.out.println(String.format("  Memory Saved: %.2f MB", sample.memorySavedBytes() / (1024.0 * 1024.0)));
+
+        // Incremental training on this single sample
+        model.trainIncremental(sample, trainingIterations);
+
+        // Record for later batch retraining
+        if (trainingData == null) {
+            trainingData = new ArrayList<>();
+        }
+        trainingData.add(sample);
+
+        System.out.println(String.format("  Training Data Size: %d samples", trainingData.size()));
+    }
+
+    /**
+     * Batch periodic retraining: retrain on accumulated samples periodically.
+     */
+    public void periodicRetrain(int minSamples, boolean weightByOutcome) {
+        if (trainingData == null || trainingData.size() < minSamples) {
+            System.out.println("Not enough samples for retraining (need " + minSamples + ", have " +
+                (trainingData == null ? 0 : trainingData.size()) + ")");
+            return;
+        }
+
+        System.out.println("\n╔════════════════════════════════════════════════════════════╗");
+        System.out.println("║       PERIODIC BATCH RETRAINING                           ║");
+        System.out.println("╚════════════════════════════════════════════════════════════╝\n");
+
+        if (weightByOutcome) {
+            model.trainWeighted(trainingData, true);
+        } else {
+            model.train(trainingData);
+        }
+
+        evaluate();
+    }
+
+    /**
+     * Get performance improvement metrics from feedback loop.
+     */
+    public String getFeedbackMetrics() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("╔════════════════════════════════════════════════════════════╗\n");
+        sb.append("║              FEEDBACK LOOP METRICS                        ║\n");
+        sb.append("╚════════════════════════════════════════════════════════════╝\n\n");
+
+        sb.append("Execution Outcomes:\n");
+        double latency = performanceMetrics.getOrDefault("avg_latency_improvement", 0.0);
+        double memory = performanceMetrics.getOrDefault("avg_memory_saved", 0.0);
+        double ratio = performanceMetrics.getOrDefault("good_decision_ratio", 0.0);
+
+        sb.append(String.format("  Avg Latency Improvement: %.4f ms\n", latency));
+        sb.append(String.format("  Avg Memory Saved: %.2f MB\n", memory / (1024.0 * 1024.0)));
+        sb.append(String.format("  Good Decision Ratio: %.1f%%\n", ratio * 100));
+
+        sb.append("\nModel Learning:\n");
+        sb.append(String.format("  Training Samples: %d\n", trainingData == null ? 0 : trainingData.size()));
+        sb.append(String.format("  Accuracy: %.2f%%\n", performanceMetrics.getOrDefault("accuracy", 0.0)));
+        sb.append(String.format("  Confidence: %.4f\n", performanceMetrics.getOrDefault("avg_confidence", 0.0)));
+        sb.append(String.format("  Loss: %.6f\n", model.getLastLoss()));
+
+        return sb.toString();
+    }
 }

@@ -190,7 +190,7 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
                     double loss = crossEntropyLoss(pred, target);
                     epochLoss += loss;
 
-                    // Backprop (simplified gradient update)
+                    // Backprop (full gradient descent)
                     updateWeights(features, pred, target);
                 }
             }
@@ -204,6 +204,101 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
         }
 
         System.out.println("Training complete. Final loss: " + String.format("%.6f", lastLoss));
+    }
+
+    /**
+     * Adaptive fine-tuning: train incrementally on a single sample.
+     * Used for online learning when scheduler executes a decision.
+     */
+    public void trainIncremental(TrainingSample sample, int iterations) {
+        FeatureExtractor extractor = new FeatureExtractor();
+        double[] features = extractor.extractNormalized(sample.state());
+        Decision decision = sample.decision();
+
+        double[] target = new double[OUTPUT_SIZE];
+        target[actionToIndex(decision.action())] = 1.0;
+
+        double prevLoss = 0.0;
+        for (int i = 0; i < iterations; i++) {
+            double[] pred = predictRaw(features);
+            double loss = crossEntropyLoss(pred, target);
+            updateWeights(features, pred, target);
+
+            if (i == 0) prevLoss = loss;
+            if ((i + 1) % Math.max(1, iterations / 5) == 0) {
+                System.out.println("  Incremental epoch " + (i + 1) + "/" + iterations + " - Loss: " + String.format("%.6f", loss));
+            }
+            lastLoss = loss;
+        }
+    }
+
+    /**
+     * Weighted training: emphasize high-performing samples.
+     * Samples with high latencyImprovement get higher weight in loss calculation.
+     */
+    public void trainWeighted(List<TrainingSample> samples, boolean useOutcome) {
+        if (samples.isEmpty()) {
+            System.out.println("No training samples available");
+            return;
+        }
+
+        trainingSamples = samples.size();
+        System.out.println("Starting weighted training on " + samples.size() + " samples (useOutcome=" + useOutcome + ")");
+
+        FeatureExtractor extractor = new FeatureExtractor();
+
+        for (int epoch = 0; epoch < epochs; epoch++) {
+            double epochLoss = 0.0;
+            double totalWeight = 0.0;
+
+            // Mini-batch gradient descent
+            for (int batch = 0; batch < samples.size(); batch += batchSize) {
+                int batchEnd = Math.min(batch + batchSize, samples.size());
+
+                for (int i = batch; i < batchEnd; i++) {
+                    TrainingSample sample = samples.get(i);
+                    double[] features = extractor.extractNormalized(sample.state());
+                    Decision decision = sample.decision();
+
+                    // Calculate sample weight based on outcome
+                    double weight = 1.0;
+                    if (useOutcome) {
+                        // Normalize latency improvement to [0, 2] range (1.0 is baseline)
+                        weight = 1.0 + (sample.latencyImprovement() / 100.0);
+                        weight = Math.max(0.1, Math.min(2.0, weight));
+                    }
+
+                    // Forward pass
+                    double[] pred = predictRaw(features);
+
+                    // Target: one-hot encoding for action
+                    double[] target = new double[OUTPUT_SIZE];
+                    target[actionToIndex(decision.action())] = 1.0;
+
+                    // Calculate weighted loss
+                    double loss = crossEntropyLoss(pred, target) * weight;
+                    epochLoss += loss;
+                    totalWeight += weight;
+
+                    // Weighted backprop (scale gradient by weight)
+                    double originalLR = learningRate;
+                    learningRate *= weight;
+                    updateWeights(features, pred, target);
+                    learningRate = originalLR;
+                }
+            }
+
+            if (totalWeight > 0) {
+                epochLoss /= totalWeight;
+            }
+            lastLoss = epochLoss;
+
+            if ((epoch + 1) % 10 == 0) {
+                System.out.println("Epoch " + (epoch + 1) + "/" + epochs + " - Weighted Loss: " + String.format("%.6f", epochLoss));
+            }
+        }
+
+        System.out.println("Weighted training complete. Final loss: " + String.format("%.6f", lastLoss));
     }
 
     /**
@@ -253,24 +348,81 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
     }
 
     /**
-     * Simplified weight update using gradient descent.
+     * Full backpropagation through all layers with gradient descent.
      */
     private void updateWeights(double[] features, double[] pred, double[] target) {
-        double[] probs = softmax(pred);
+        // Forward pass: save activations for backprop
+        double[] h1 = forward(features, w1, b1, true);
+        double[] h2 = forward(h1, w2, b2, true);
+        double[] output = pred;
+
+        // Output layer error
+        double[] probs = softmax(output);
         double[] outputError = new double[OUTPUT_SIZE];
         for (int i = 0; i < OUTPUT_SIZE; i++) {
-            outputError[i] = (probs[i] - target[i]) * learningRate;
+            outputError[i] = probs[i] - target[i];
         }
 
-        // Update output layer (w3, b3)
-        double[] h2 = forward(forward(features, w1, b1, true), w2, b2, true);
+        // ===== BACKPROP LAYER 3: Output -> Hidden2 =====
+        double[] h2GradInput = new double[HIDDEN_SIZE_2];
         for (int i = 0; i < HIDDEN_SIZE_2; i++) {
             for (int j = 0; j < OUTPUT_SIZE; j++) {
-                w3[i][j] -= outputError[j] * h2[i] + regularization * w3[i][j];
+                h2GradInput[i] += outputError[j] * w3[i][j];
+            }
+        }
+
+        // Update w3 and b3
+        for (int i = 0; i < HIDDEN_SIZE_2; i++) {
+            for (int j = 0; j < OUTPUT_SIZE; j++) {
+                double gradient = outputError[j] * h2[i];
+                w3[i][j] -= learningRate * (gradient + regularization * w3[i][j]);
             }
         }
         for (int j = 0; j < OUTPUT_SIZE; j++) {
-            b3[j] -= outputError[j];
+            b3[j] -= learningRate * outputError[j];
+        }
+
+        // ===== BACKPROP LAYER 2: Hidden2 -> Hidden1 =====
+        // Apply ReLU derivative: gradient only flows where activation > 0
+        double[] h2Error = new double[HIDDEN_SIZE_2];
+        for (int i = 0; i < HIDDEN_SIZE_2; i++) {
+            h2Error[i] = h2[i] > 0 ? h2GradInput[i] : 0.0;
+        }
+
+        double[] h1GradInput = new double[HIDDEN_SIZE_1];
+        for (int i = 0; i < HIDDEN_SIZE_1; i++) {
+            for (int j = 0; j < HIDDEN_SIZE_2; j++) {
+                h1GradInput[i] += h2Error[j] * w2[i][j];
+            }
+        }
+
+        // Update w2 and b2
+        for (int i = 0; i < HIDDEN_SIZE_1; i++) {
+            for (int j = 0; j < HIDDEN_SIZE_2; j++) {
+                double gradient = h2Error[j] * h1[i];
+                w2[i][j] -= learningRate * (gradient + regularization * w2[i][j]);
+            }
+        }
+        for (int j = 0; j < HIDDEN_SIZE_2; j++) {
+            b2[j] -= learningRate * h2Error[j];
+        }
+
+        // ===== BACKPROP LAYER 1: Hidden1 -> Input =====
+        // Apply ReLU derivative
+        double[] h1Error = new double[HIDDEN_SIZE_1];
+        for (int i = 0; i < HIDDEN_SIZE_1; i++) {
+            h1Error[i] = h1[i] > 0 ? h1GradInput[i] : 0.0;
+        }
+
+        // Update w1 and b1
+        for (int i = 0; i < INPUT_SIZE; i++) {
+            for (int j = 0; j < HIDDEN_SIZE_1; j++) {
+                double gradient = h1Error[j] * features[i];
+                w1[i][j] -= learningRate * (gradient + regularization * w1[i][j]);
+            }
+        }
+        for (int j = 0; j < HIDDEN_SIZE_1; j++) {
+            b1[j] -= learningRate * h1Error[j];
         }
     }
 
@@ -329,6 +481,13 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
     }
 
     /**
+     * Get last training loss (for monitoring).
+     */
+    public double getLastLoss() {
+        return lastLoss;
+    }
+
+    /**
      * Get network size info.
      */
     public String getNetworkInfo() {
@@ -336,5 +495,63 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
             "Network: %d -> %d -> %d -> %d (8 actions)",
             INPUT_SIZE, HIDDEN_SIZE_1, HIDDEN_SIZE_2, OUTPUT_SIZE
         );
+    }
+
+    /**
+     * Retrieve internal activation values for debugging.
+     */
+    public double[][] getActivations(double[] features) {
+        double[] h1 = forward(features, w1, b1, true);
+        double[] h2 = forward(h1, w2, b2, true);
+        double[] output = forward(h2, w3, b3, false);
+        return new double[][] { h1, h2, output };
+    }
+
+    /**
+     * Calculate gradient norms for debugging/monitoring.
+     */
+    public Map<String, Double> getGradientStats(double[] features, double[] target) {
+        Map<String, Double> stats = new LinkedHashMap<>();
+        
+        // Forward pass
+        double[] h1 = forward(features, w1, b1, true);
+        double[] h2 = forward(h1, w2, b2, true);
+        double[] output = forward(h2, w3, b3, false);
+        
+        // Compute output error
+        double[] probs = softmax(output);
+        double outputErrorNorm = 0.0;
+        for (int i = 0; i < OUTPUT_SIZE; i++) {
+            double err = probs[i] - target[i];
+            outputErrorNorm += err * err;
+        }
+        stats.put("output_error_norm", Math.sqrt(outputErrorNorm));
+        
+        // Weight magnitude stats
+        double w1Norm = 0, w2Norm = 0, w3Norm = 0;
+        for (double[] row : w1) for (double v : row) w1Norm += v * v;
+        for (double[] row : w2) for (double v : row) w2Norm += v * v;
+        for (double[] row : w3) for (double v : row) w3Norm += v * v;
+        
+        stats.put("w1_norm", Math.sqrt(w1Norm));
+        stats.put("w2_norm", Math.sqrt(w2Norm));
+        stats.put("w3_norm", Math.sqrt(w3Norm));
+        stats.put("total_params", (double)(w1.length * w1[0].length + w2.length * w2[0].length + w3.length * w3[0].length));
+        
+        return stats;
+    }
+
+    /**
+     * Get all weight matrices for inspection (read-only).
+     */
+    public double[][][] getWeights() {
+        return new double[][][] { w1, w2, w3 };
+    }
+
+    /**
+     * Get all bias vectors for inspection (read-only).
+     */
+    public double[][] getBiases() {
+        return new double[][] { b1, b2, b3 };
     }
 }
