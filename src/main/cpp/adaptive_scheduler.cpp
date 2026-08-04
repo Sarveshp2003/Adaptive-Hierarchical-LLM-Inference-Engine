@@ -97,9 +97,138 @@ public:
     }
 };
 
-// Shim accessor: return current native engine instance. Replaceable later with a dynamic loader that binds to a real NativeEngine.
-static MockNativeEngine* getNativeEngine() {
-    return MockNativeEngine::instance();
+// Native engine C API interface (optional real engine). The code will attempt to dynamically
+// load a native engine library that exposes `adaptive_engine_get_api()` returning a
+// pointer to this struct. If the library or symbol is not available, the implementation
+// falls back to the in-process MockNativeEngine above.
+
+extern "C" {
+    typedef struct NativeEngineApi {
+        void (*start)();
+        void (*stop)();
+        long (*prefetchLayer)(int layerId);
+        long (*evictLayer)(int layerId);
+        long (*keepLayer)(int layerId);
+        long (*moveKvToRam)(long kvPageId);
+        long (*moveKvToGpu)(long kvPageId);
+        long (*compressKv)(long kvPageId);
+        long (*offloadKv)(long kvPageId);
+        int  (*getCurrentLayer)();
+        long (*getGpuMemory)();
+        int  (*getKvPages)();
+        int  (*getCachedLayers)();
+    } NativeEngineApi;
+
+    typedef NativeEngineApi* (*GetApiFn)();
+}
+
+static NativeEngineApi* g_nativeApi = nullptr;
+static void* g_nativeHandle = nullptr;
+
+#ifdef _WIN32
+#include <windows.h>
+static void tryLoadNativeApi() {
+    if (g_nativeApi) return;
+    const char* candidates[] = { "adaptive_engine.dll", "native_engine.dll", "adaptive_scheduler_engine.dll" };
+    for (auto name : candidates) {
+        HMODULE h = LoadLibraryA(name);
+        if (!h) continue;
+        auto sym = (FARPROC)GetProcAddress(h, "adaptive_engine_get_api");
+        if (!sym) { FreeLibrary(h); continue; }
+        auto getApi = (GetApiFn)sym;
+        g_nativeApi = getApi();
+        if (g_nativeApi) { g_nativeHandle = (void*)h; std::cout << "[NativeLoader] Loaded native engine: " << name << "\n"; return; }
+        FreeLibrary(h);
+    }
+    std::cout << "[NativeLoader] No native engine library found; falling back to MockNativeEngine\n";
+}
+#else
+#include <dlfcn.h>
+static void tryLoadNativeApi() {
+    if (g_nativeApi) return;
+    const char* candidates[] = { "libadaptive_engine.so", "libnative_engine.so", "libadaptive_scheduler_engine.so" };
+    for (auto name : candidates) {
+        void* h = dlopen(name, RTLD_NOW | RTLD_LOCAL);
+        if (!h) continue;
+        auto sym = dlsym(h, "adaptive_engine_get_api");
+        if (!sym) { dlclose(h); continue; }
+        auto getApi = (GetApiFn)sym;
+        g_nativeApi = getApi();
+        if (g_nativeApi) { g_nativeHandle = h; std::cout << "[NativeLoader] Loaded native engine: " << name << "\n"; return; }
+        dlclose(h);
+    }
+    std::cout << "[NativeLoader] No native engine library found; falling back to MockNativeEngine\n";
+}
+#endif
+
+// Helper wrappers that call either the loaded native API or the MockNativeEngine fallback.
+static void native_start() {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->start) { g_nativeApi->start(); return; }
+    MockNativeEngine::instance()->start();
+}
+static void native_stop() {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->stop) { g_nativeApi->stop(); return; }
+    MockNativeEngine::instance()->stop();
+}
+static long native_prefetchLayer(int layerId) {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->prefetchLayer) return g_nativeApi->prefetchLayer(layerId);
+    return MockNativeEngine::instance()->prefetchLayer(layerId);
+}
+static long native_evictLayer(int layerId) {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->evictLayer) return g_nativeApi->evictLayer(layerId);
+    return MockNativeEngine::instance()->evictLayer(layerId);
+}
+static long native_keepLayer(int layerId) {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->keepLayer) return g_nativeApi->keepLayer(layerId);
+    return MockNativeEngine::instance()->keepLayer(layerId);
+}
+static long native_moveKvToRam(long kvPageId) {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->moveKvToRam) return g_nativeApi->moveKvToRam(kvPageId);
+    return MockNativeEngine::instance()->moveKvToRam(kvPageId);
+}
+static long native_moveKvToGpu(long kvPageId) {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->moveKvToGpu) return g_nativeApi->moveKvToGpu(kvPageId);
+    return MockNativeEngine::instance()->moveKvToGpu(kvPageId);
+}
+static long native_compressKv(long kvPageId) {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->compressKv) return g_nativeApi->compressKv(kvPageId);
+    return MockNativeEngine::instance()->compressKv(kvPageId);
+}
+static long native_offloadKv(long kvPageId) {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->offloadKv) return g_nativeApi->offloadKv(kvPageId);
+    return MockNativeEngine::instance()->offloadKv(kvPageId);
+}
+static int native_getCurrentLayer() {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->getCurrentLayer) return g_nativeApi->getCurrentLayer();
+    return MockNativeEngine::instance()->currentLayer;
+}
+static long native_getGpuMemory() {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->getGpuMemory) return g_nativeApi->getGpuMemory();
+    // Add small jitter when using mock
+    MockNativeEngine* m = MockNativeEngine::instance();
+    m->gpuMemoryUsed += (rand() % 100 - 50) * 1024 * 1024;
+    return m->gpuMemoryUsed;
+}
+static int native_getKvPages() {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->getKvPages) return g_nativeApi->getKvPages();
+    return MockNativeEngine::instance()->kvPages;
+}
+static int native_getCachedLayers() {
+    tryLoadNativeApi();
+    if (g_nativeApi && g_nativeApi->getCachedLayers) return g_nativeApi->getCachedLayers();
+    return MockNativeEngine::instance()->cachedLayers;
 }
 
 // ============================================================================
@@ -109,8 +238,7 @@ static MockNativeEngine* getNativeEngine() {
 JNIEXPORT jint JNICALL Java_com_adaptivellm_scheduler_ProductionMemoryStateProvider_getCurrentLayerNative
   (JNIEnv *env, jobject obj) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        return engine->currentLayer;
+        return native_getCurrentLayer();
     } catch (const std::exception& e) {
         std::cerr << "[getCurrentLayerNative] Exception: " << e.what() << "\n";
         return -1;
@@ -120,9 +248,7 @@ JNIEXPORT jint JNICALL Java_com_adaptivellm_scheduler_ProductionMemoryStateProvi
 JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_ProductionMemoryStateProvider_getGpuMemoryNative
   (JNIEnv *env, jobject obj) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        engine->gpuMemoryUsed += (rand() % 100 - 50) * 1024 * 1024;
-        return engine->gpuMemoryUsed;
+        return native_getGpuMemory();
     } catch (const std::exception& e) {
         std::cerr << "[getGpuMemoryNative] Exception: " << e.what() << "\n";
         return 2L * 1024 * 1024 * 1024;
@@ -132,8 +258,7 @@ JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_ProductionMemoryStateProv
 JNIEXPORT jint JNICALL Java_com_adaptivellm_scheduler_ProductionMemoryStateProvider_getKvPagesNative
   (JNIEnv *env, jobject obj) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        return engine->kvPages;
+        return native_getKvPages();
     } catch (const std::exception& e) {
         std::cerr << "[getKvPagesNative] Exception: " << e.what() << "\n";
         return 256;
@@ -143,8 +268,7 @@ JNIEXPORT jint JNICALL Java_com_adaptivellm_scheduler_ProductionMemoryStateProvi
 JNIEXPORT jint JNICALL Java_com_adaptivellm_scheduler_ProductionMemoryStateProvider_getCachedLayersNative
   (JNIEnv *env, jobject obj) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        return engine->cachedLayers;
+        return native_getCachedLayers();
     } catch (const std::exception& e) {
         std::cerr << "[getCachedLayersNative] Exception: " << e.what() << "\n";
         return 2;
@@ -158,8 +282,7 @@ JNIEXPORT jint JNICALL Java_com_adaptivellm_scheduler_ProductionMemoryStateProvi
 JNIEXPORT void JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_nativeStart
   (JNIEnv *env, jobject obj, jobject nativeEngine) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        engine->start();
+        native_start();
         std::cout << "[Phase2NativeEngineAdapter] Engine started via JNI\n";
     } catch (const std::exception& e) {
         std::cerr << "[nativeStart] Exception: " << e.what() << "\n";
@@ -169,8 +292,7 @@ JNIEXPORT void JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_
 JNIEXPORT void JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_nativeStop
   (JNIEnv *env, jobject obj, jobject nativeEngine) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        engine->stop();
+        native_stop();
         std::cout << "[Phase2NativeEngineAdapter] Engine stopped via JNI\n";
     } catch (const std::exception& e) {
         std::cerr << "[nativeStop] Exception: " << e.what() << "\n";
@@ -180,8 +302,7 @@ JNIEXPORT void JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_
 JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_nativePrefetchLayer
   (JNIEnv *env, jobject obj, jobject nativeEngine, jint layerId) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        long latency = engine->prefetchLayer(layerId);
+        long latency = native_prefetchLayer(layerId);
         std::cout << "[nativePrefetchLayer] Layer " << layerId << " prefetched (latency=" << latency << "ms)\n";
         return latency;
     } catch (const std::exception& e) {
@@ -193,8 +314,7 @@ JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter
 JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_nativeEvictLayer
   (JNIEnv *env, jobject obj, jobject nativeEngine, jint layerId) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        long latency = engine->evictLayer(layerId);
+        long latency = native_evictLayer(layerId);
         std::cout << "[nativeEvictLayer] Layer " << layerId << " evicted (latency=" << latency << "ms)\n";
         return latency;
     } catch (const std::exception& e) {
@@ -206,8 +326,7 @@ JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter
 JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_nativeKeepLayer
   (JNIEnv *env, jobject obj, jobject nativeEngine, jint layerId) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        long latency = engine->keepLayer(layerId);
+        long latency = native_keepLayer(layerId);
         return latency;
     } catch (const std::exception& e) {
         std::cerr << "[nativeKeepLayer] Exception: " << e.what() << "\n";
@@ -218,8 +337,7 @@ JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter
 JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_nativeMoveKvToRam
   (JNIEnv *env, jobject obj, jobject nativeEngine, jlong kvPageId) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        long latency = engine->moveKvToRam(kvPageId);
+        long latency = native_moveKvToRam(kvPageId);
         std::cout << "[nativeMoveKvToRam] KV page " << kvPageId << " moved (latency=" << latency << "ms)\n";
         return latency;
     } catch (const std::exception& e) {
@@ -231,8 +349,7 @@ JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter
 JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_nativeMoveKvToGpu
   (JNIEnv *env, jobject obj, jobject nativeEngine, jlong kvPageId) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        long latency = engine->moveKvToGpu(kvPageId);
+        long latency = native_moveKvToGpu(kvPageId);
         std::cout << "[nativeMoveKvToGpu] KV page " << kvPageId << " moved (latency=" << latency << "ms)\n";
         return latency;
     } catch (const std::exception& e) {
@@ -244,8 +361,7 @@ JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter
 JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_nativeCompressKv
   (JNIEnv *env, jobject obj, jobject nativeEngine, jlong kvPageId) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        long latency = engine->compressKv(kvPageId);
+        long latency = native_compressKv(kvPageId);
         std::cout << "[nativeCompressKv] KV page " << kvPageId << " compressed (latency=" << latency << "ms)\n";
         return latency;
     } catch (const std::exception& e) {
@@ -257,8 +373,7 @@ JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter
 JNIEXPORT jlong JNICALL Java_com_adaptivellm_scheduler_Phase2NativeEngineAdapter_nativeOffloadKv
   (JNIEnv *env, jobject obj, jobject nativeEngine, jlong kvPageId) {
     try {
-        MockNativeEngine* engine = MockNativeEngine::instance();
-        long latency = engine->offloadKv(kvPageId);
+        long latency = native_offloadKv(kvPageId);
         std::cout << "[nativeOffloadKv] KV page " << kvPageId << " offloaded (latency=" << latency << "ms)\n";
         return latency;
     } catch (const std::exception& e) {
