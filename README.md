@@ -55,25 +55,38 @@ The current prototype is focused on being visible, debuggable, and extensible ra
 
 ## Adaptive AI Scheduler 
 
-### Status: Production-Ready
-The adaptive scheduler is now integrated and validated with full backpropagation and closed-loop learning:
+### Status: Phase 2 - Production Wiring (Local Development) 🔨
+The adaptive scheduler is now in Phase 2, implementing real JNI integration for local development:
 
-- **Full Backpropagation**: All 3 neural network layers train with proper gradient flow
-- **Closed-Loop Learning**: Real-time feedback from execution results (online + batch retraining)
-- **Online Learning**: <1ms overhead per decision with continuous improvement
-- **Batch Retraining**: Periodic optimization every 20-100 decisions
-- **Native Integration**: Complete bridge from scheduler decisions to runtime execution via NativeEngineAdapter
+- **Phase 1 Complete** ✅: Full backpropagation and closed-loop learning validated
+  - 1000x loss improvement (1.8545 → 0.0002)
+  - 158 decisions at 100% success rate
+  - Online learning <1ms overhead
+  
+- **Phase 2 In Progress** 🔨: Production wiring with local JNI integration
+  - ProductionMemoryStateProvider – Real metrics from NativeEngine via JNI
+  - Phase2NativeEngineAdapter – JNI bridge for 8 scheduler actions
+  - Phase2ProductionIntegrationTest – Production validation framework
+  - Local machine compilation and testing (no cloud/production)
 
-### Key Components
+- **Phase 3 Planned** ⏳: Distributed simulation on local machine
+  - Multi-node scheduler simulation (5-50+ nodes)
+  - Federated learning across simulated nodes
+  - Local IPC message passing
+  - Performance benchmarking
+
+### Key Components (Phase 1-2)
 - `AdaptiveScheduler.java` – Core decision engine (8 action types: prefetch, evict, move KV, compress, offload, etc.)
 - `NeuralNetworkPredictor.java` – Multi-layer neural network for decision prediction
 - `FeatureExtractor.java` – Converts memory state to feature vectors
 - `MLTrainer.java` – Backpropagation trainer with online and batch learning modes
-- `NativeEngineAdapter.java` – Bridges scheduler decisions to native runtime calls
+- `NativeEngineAdapter.java` – Bridges scheduler decisions to native runtime calls (Phase 1)
+- `ProductionMemoryStateProvider.java` – Fetches real metrics via JNI (Phase 2)
+- `Phase2NativeEngineAdapter.java` – JNI bridge for 8 actions with atomic metrics (Phase 2)
 - `SchedulerRuntimeController.java` – Background orchestration loop for continuous decision-making
 - `RuntimeMemoryStateProvider.java` – Provides runtime memory state snapshots
 
-### Integration Test Results (100% Success Rate)
+### Integration Test Results (Phase 1 Validated)
 Test Duration: **10 seconds** | Decisions Executed: **158** | Success Rate: **100%** ✅
 
 | Metric | Value |
@@ -88,6 +101,13 @@ Test Duration: **10 seconds** | Decisions Executed: **158** | Success Rate: **10
 | Compilation | 0 errors, 0 warnings ✅ |
 | Thread Safety | Verified ✅ |
 | Error Handling | Robust & tested ✅ |
+
+### Phase 2 Status (In Progress)
+- ✅ ProductionMemoryStateProvider.java (8.6 KB) - Production-ready for JNI integration
+- ✅ Phase2NativeEngineAdapter.java (14.2 KB) - 9 native method stubs
+- ✅ Phase2ProductionIntegrationTest.java (7.1 KB) - Validation framework
+- ⏳ C++ JNI native method implementation (using provided templates)
+- ⏳ libadaptive_scheduler compilation and local testing
 
 ## End-to-end data flow
 
@@ -132,6 +152,7 @@ Java Control Layer (Feedback Learning Loop)
 8. The GPU backend executes the active compute path when available.
 9. Execution metrics (latency, memory usage) flow back to the control plane.
 10. The scheduler learns from results via online learning and periodic batch retraining to improve future decisions.
+11. **Phase 2**: ProductionMemoryStateProvider and Phase2NativeEngineAdapter enable real JNI integration for production-grade metrics.
 
 This maps to the repository structure as follows:
 
@@ -151,9 +172,14 @@ The project is currently working through the following areas:
 - ✅ Memory allocation and tensor lifecycle visibility (COMPLETE)
 - ✅ **Adaptive AI Scheduler with full backpropagation and closed-loop learning (COMPLETE)**
 - ✅ **Integration with NativeEngine and runtime orchestration (COMPLETE)**
-- ⏳ Production deployment and real workload testing (IN PROGRESS)
-- ⏳ Hyperparameter tuning based on production metrics (READY TO START)
-- ⏳ A/B testing against rule-based baseline (READY TO START)
+- 🔨 **Phase 2: Production wiring with real JNI integration (IN PROGRESS)**
+  - ProductionMemoryStateProvider for real metrics
+  - Phase2NativeEngineAdapter for 8 action types
+  - Local machine C++ compilation and testing
+- ⏳ **Phase 3: Distributed simulation on local machine (PLANNED)**
+  - Multi-node scheduler simulation
+  - Federated learning across nodes
+  - Performance benchmarking
 - Future work: richer KV paging/compression, off-heap memory management, and more advanced scheduling strategies
 
 ## How others can try it
@@ -175,11 +201,16 @@ The project is currently working through the following areas:
    - `src/main/java/com/adaptivellm/scheduler/` for the adaptive AI scheduling stack
 4. For Java-side integration, compile or run code that uses `com.adaptivellm.nativeengine.NativeEngine` and call the native entry points directly.
 5. **For scheduler experiments**, try the Java scheduler classes directly:
-   - Run `SchedulerNativeEngineIntegrationTest.java` to see the full end-to-end integration in action
-   - Evaluate how the neural network predictor behaves on different memory states
-   - Use `RuntimeMemoryStateProvider` for realistic state simulation
-   - Leverage `NativeEngineAdapter` to execute decisions on actual runtime
-6. For more advanced experiments, swap in other model files, adjust the cache capacity, or extend the scheduler with new decision actions.
+   - Run `SchedulerNativeEngineIntegrationTest.java` to see Phase 1 integration
+   - Run `Phase2ProductionIntegrationTest.java` to validate Phase 2 components
+   - Explore ProductionMemoryStateProvider for real metric collection
+   - Test Phase2NativeEngineAdapter with local Llama.cpp
+6. **For Phase 2 development**, see PHASE_2_PRODUCTION_WIRING.md for:
+   - JNI native method templates
+   - C++ compilation instructions (CMake)
+   - Local library loading and testing
+   - Performance benchmarking setup
+7. For more advanced experiments, swap in other model files, adjust the cache capacity, or extend the scheduler with new decision actions.
 
 ## Repository hygiene
 
