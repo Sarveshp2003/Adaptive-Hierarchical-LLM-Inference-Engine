@@ -276,3 +276,72 @@ The project is currently working through the following areas:
 - Generated build outputs and temporary files are ignored by `.gitignore`.
 - Local model artifacts and large runtime outputs are not tracked by default.
 - The active source tree is focused on the runtime, bridge, and smoke-test path.
+
+## Troubleshooting (local)
+
+If model loading, build, or runtime integration fails during local testing, try the following checks in order:
+
+- Toolchain and environment
+  - Windows: run the "x64 Native Tools Command Prompt for VS" or call `vcvars64.bat` before building.
+  - Linux: ensure `cmake`, `g++`/`clang++`, and OpenMP/BLAS libraries are installed.
+- Library visibility
+  - Ensure built DLLs/so files are on `PATH` (Windows) or `LD_LIBRARY_PATH` (Linux), or use `-Djava.library.path` when running Java tests.
+- Model path and permissions
+  - Verify `LLAMA_MODEL_PATH` points to an existing GGUF file and is readable by the test process.
+  - Check file size and integrity; use `llama_model_loader` logs for format or parser errors.
+- Symbol linking
+  - Confirm `adaptive_engine_get_api` is exported from the built native library (use `dumpbin /exports` on Windows or `nm -D` on Linux).
+- Verbose logs
+  - Enable wrapper log output by running tests with the deployed DLLs and inspect console logs for `llama_wrapper` messages.
+
+If problems persist, capture the build and runtime logs and open an issue with the logs attached.
+
+## Windows: step-by-step local build and test
+
+1. Open "x64 Native Tools Command Prompt for VS" (or run `vcvars64.bat` in PowerShell):
+
+```powershell
+call "C:\\Program Files\\Microsoft Visual Studio\\18\\Community\\VC\\Auxiliary\\Build\\vcvars64.bat"
+```
+
+2. Build the llama wrapper (CMake):
+
+```powershell
+cd native-engine\\llama_wrapper
+cmake -S . -B build -A x64 -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --target adaptive_engine_llama
+```
+
+3. Copy built DLLs to a local lib folder used by Java tests (example):
+
+```powershell
+mkdir E:\\lib -Force
+Copy-Item native-engine\\llama_wrapper\\build\\lib\\Release\\adaptive_engine_llama.dll E:\\lib\\adaptive_engine.dll -Force
+Copy-Item native-engine\\llama_wrapper\\build\\bin\\Release\\*.dll E:\\lib -Force
+```
+
+4. Set model path and run Java integration test:
+
+```powershell
+setx LLAMA_MODEL_PATH "E:\\AdaptiveLLMRuntime\\models\\Llama-3.2-3B-Instruct-f16.gguf"
+set LLAMA_MODEL_PATH=E:\\AdaptiveLLMRuntime\\models\\Llama-3.2-3B-Instruct-f16.gguf
+javac -d bin $(Get-ChildItem -Path src -Recurse -Filter *.java | ForEach-Object FullName)
+java -Djava.library.path=E:\\lib -cp bin com.adaptivellm.scheduler.Phase2ProductionIntegrationTest
+```
+
+5. Inspect console output for `llama_wrapper` model load messages and integration test summary.
+
+## Local end-to-end checklist
+
+Use this checklist before merging or releasing code that touches native integrations:
+
+1. Verify local toolchain (MSVC or g++) is available and `cmake` runs.
+2. Build native wrapper and dependent libs via CMake.
+3. Deploy native artifacts to `E:\\lib` (Windows) or `./lib` (Linux) and ensure runtime visibility.
+4. Set `LLAMA_MODEL_PATH` to a local GGUF test model and confirm file access.
+5. Run native unit tests (export test, prefetch/evict test).
+6. Run `Phase2ProductionIntegrationTest` with the model loaded; confirm decisions and online learning are active.
+7. Review logs for any fallback messages to MockNativeEngine; if observed, rebuild and re-run to ensure native engine is used.
+8. Commit any remaining Java test helper changes to a feature branch if they are required temporarily; avoid committing local-only debugging changes to main.
+
+These guidelines prioritize reliable local validation over remote CI model runs.

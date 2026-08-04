@@ -76,3 +76,31 @@ The Adaptive Hierarchical LLM Inference Engine with integrated AI scheduler is i
 Updated: 2026-08-04T12:53:55.423+05:30
 
 Maintainer notes: Running CI and replacing the mock engine are the immediate next priorities. The project is ready for Phase 2.2 development once a native artifact is available or local toolchain is installed.
+
+## Troubleshooting (local)
+
+Common failure modes and mitigations:
+
+- Build failures
+  - Ensure the correct Visual Studio Native Tools or g++ toolchain is active and `cmake` was invoked with the correct generator/architecture.
+  - On Windows, build in the Developer Command Prompt to inherit the MSVC environment.
+- Model load failures
+  - Confirm `LLAMA_MODEL_PATH` points to a readable GGUF file and its metadata can be dumped by the native loader.
+  - If `llama_model_load_from_file` returns NULL, inspect the console logs from `llama_wrapper` for parser/format messages.
+- Loader fallback to MockNativeEngine
+  - If logs show the native loader falling back to MockNativeEngine, verify the DLL exports (adaptive_engine_get_api) and that the DLL is discoverable by the process (`PATH`/`java.library.path`).
+
+## Local testing checklist
+
+Before accepting changes that affect native bindings, run the following locally:
+
+1. Ensure toolchain: Visual Studio (Windows) or g++/cmake (Linux).
+2. Build the native wrapper and dependent libraries via CMake.
+3. Copy built DLLs/so to the local lib directory and ensure they are on `PATH` or set `-Djava.library.path` when running Java tests.
+4. Set `LLAMA_MODEL_PATH` to a local GGUF file and validate file permissions.
+5. Run native export and prefetch/evict tests and confirm expected outputs.
+6. Run `Phase2ProductionIntegrationTest` with at least 50 decisions; for system-check run 1000 decisions.
+7. Confirm online learning is active and that no frequent fallbacks to MockNativeEngine are observed.
+8. Keep temporary Java test edits in a local or feature branch; do not merge un-reviewed test-only changes into `main`.
+
+Follow this local-first workflow for robust integration testing and stable releases.
