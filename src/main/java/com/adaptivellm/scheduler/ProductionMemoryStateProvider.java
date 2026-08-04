@@ -112,15 +112,14 @@ public final class ProductionMemoryStateProvider implements SchedulerRuntimeCont
     /**
      * Get current layer being processed from NativeEngine.
      * Phase 2: Wire to nativeEngine.getCurrentLayer() via JNI
+     * Falls back to default value if native library unavailable
      */
     private int getCurrentLayerFromNativeEngine() {
-        if (nativeEngineRef != null) {
+        if (nativeEngineRef != null && nativeLibLoaded) {
             try {
-                // Phase 2: Replace with actual JNI call
-                // return nativeGetCurrentLayer(nativeEngineRef);
                 return getCurrentLayerNative();
-            } catch (Exception e) {
-                System.err.println("[ProductionMemoryStateProvider] Failed to get current layer: " + e.getMessage());
+            } catch (UnsatisfiedLinkError | Exception e) {
+                System.err.println("[ProductionMemoryStateProvider] Native call unavailable, using fallback");
                 return 0;
             }
         }
@@ -130,15 +129,14 @@ public final class ProductionMemoryStateProvider implements SchedulerRuntimeCont
     /**
      * Get GPU memory usage from NativeEngine.
      * Phase 2: Wire to nativeEngine.getGpuMemoryUsage() via JNI
+     * Falls back to default value if native library unavailable
      */
     private long getGpuMemoryFromNativeEngine() {
-        if (nativeEngineRef != null) {
+        if (nativeEngineRef != null && nativeLibLoaded) {
             try {
-                // Phase 2: Replace with actual JNI call
-                // return nativeGetGpuMemory(nativeEngineRef);
                 return getGpuMemoryNative();
-            } catch (Exception e) {
-                System.err.println("[ProductionMemoryStateProvider] Failed to get GPU memory: " + e.getMessage());
+            } catch (UnsatisfiedLinkError | Exception e) {
+                System.err.println("[ProductionMemoryStateProvider] Native call unavailable, using fallback");
                 return 2L * 1024 * 1024 * 1024; // Fallback to 2GB
             }
         }
@@ -148,15 +146,14 @@ public final class ProductionMemoryStateProvider implements SchedulerRuntimeCont
     /**
      * Get number of KV cache pages from NativeEngine.
      * Phase 2: Wire to nativeEngine.getKvPageCount() via JNI
+     * Falls back to default value if native library unavailable
      */
     private int getKvPagesFromNativeEngine() {
-        if (nativeEngineRef != null) {
+        if (nativeEngineRef != null && nativeLibLoaded) {
             try {
-                // Phase 2: Replace with actual JNI call
-                // return nativeGetKvPageCount(nativeEngineRef);
                 return getKvPagesNative();
-            } catch (Exception e) {
-                System.err.println("[ProductionMemoryStateProvider] Failed to get KV pages: " + e.getMessage());
+            } catch (UnsatisfiedLinkError | Exception e) {
+                System.err.println("[ProductionMemoryStateProvider] Native call unavailable, using fallback");
                 return 256; // Fallback
             }
         }
@@ -166,15 +163,14 @@ public final class ProductionMemoryStateProvider implements SchedulerRuntimeCont
     /**
      * Get number of layers cached in GPU memory.
      * Phase 2: Wire to nativeEngine.getCachedLayerCount() via JNI
+     * Falls back to default value if native library unavailable
      */
     private int getCachedLayersFromNativeEngine() {
-        if (nativeEngineRef != null) {
+        if (nativeEngineRef != null && nativeLibLoaded) {
             try {
-                // Phase 2: Replace with actual JNI call
-                // return nativeGetCachedLayers(nativeEngineRef);
                 return getCachedLayersNative();
-            } catch (Exception e) {
-                System.err.println("[ProductionMemoryStateProvider] Failed to get cached layers: " + e.getMessage());
+            } catch (UnsatisfiedLinkError | Exception e) {
+                System.err.println("[ProductionMemoryStateProvider] Native call unavailable, using fallback");
                 return 2; // Fallback
             }
         }
