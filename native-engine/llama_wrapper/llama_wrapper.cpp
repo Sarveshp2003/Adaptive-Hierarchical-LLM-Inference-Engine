@@ -8,6 +8,12 @@
 #include "llama.h"
 #endif
 
+#if defined(_WIN32)
+#define ADAPTIVE_ENGINE_EXPORT __declspec(dllexport)
+#else
+#define ADAPTIVE_ENGINE_EXPORT __attribute__((visibility("default")))
+#endif
+
 extern "C" {
     typedef struct NativeEngineApi {
         void (*start)();
@@ -168,7 +174,7 @@ extern "C" {
         &lw_getCachedLayers
     };
 
-    NativeEngineApi* adaptive_engine_get_api() {
+    ADAPTIVE_ENGINE_EXPORT NativeEngineApi* adaptive_engine_get_api() {
         return &g_llama_api;
     }
 }
