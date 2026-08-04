@@ -38,8 +38,15 @@ jobs:
       - name: Build native library (Linux)
         if: runner.os == 'Linux'
         run: |
-          chmod +x build_native_library.sh || true
-          ./build_native_library.sh
+          set -e
+          echo "JAVA_HOME: $JAVA_HOME"
+          mkdir -p lib
+          echo "[COMPILE] Building adaptive_scheduler native lib"
+          g++ -shared -fPIC -O2 -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -I"src/main/cpp/headers" -o lib/libadaptive_scheduler.so src/main/cpp/adaptive_scheduler.cpp -pthread || (echo "adaptive_scheduler build failed"; exit 1)
+          echo "[COMPILE] Building adaptive_engine shim"
+          g++ -shared -fPIC -O2 -o lib/libadaptive_engine.so native-engine/shim/adaptive_engine_shim.cpp -pthread || (echo "adaptive_engine_shim build failed"; exit 1)
+          echo "[INFO] Built lib contents:" 
+          ls -lah lib || true
 
       - name: Build native library (Windows)
         if: runner.os == 'Windows'
