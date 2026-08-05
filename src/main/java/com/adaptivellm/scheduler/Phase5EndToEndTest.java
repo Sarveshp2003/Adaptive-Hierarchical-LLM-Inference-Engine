@@ -22,7 +22,7 @@ public final class Phase5EndToEndTest {
 
     public static void main(String[] args) {
         System.out.println("╔════════════════════════════════════════════════════════════╗");
-        System.out.println("║         PHASE 5: AI SCHEDULER END-TO-END TESTS            ║");
+        System.out.println("║         PHASE 5: AI SCHEDULER END-TO-END TESTS             ║");
         System.out.println("╚════════════════════════════════════════════════════════════╝\n");
 
         try {
@@ -35,7 +35,7 @@ public final class Phase5EndToEndTest {
             testCrossValidation();
 
             System.out.println("\n╔════════════════════════════════════════════════════════════╗");
-            System.out.println("║              TEST SUMMARY                                ║");
+            System.out.println("║              TEST SUMMARY                                  ║");
             System.out.println("╚════════════════════════════════════════════════════════════╝");
             System.out.println("PASSED: " + passed);
             System.out.println("FAILED: " + failed);
@@ -61,17 +61,19 @@ public final class Phase5EndToEndTest {
         try {
             NeuralNetworkPredictor nn = new NeuralNetworkPredictor();
             
-            // Test prediction with random input
-            double[] testFeatures = {
-                0.5,   // current_layer
-                0.3,   // current_token
+            // Test prediction with normalized input derived from MemoryState
+            FeatureExtractor extractor = new FeatureExtractor();
+            MemoryState state = new MemoryState(
+                10,    // current_layer
+                1000,  // current_token
                 0.7,   // gpu_usage
                 0.6,   // ram_usage
-                0.4,   // storage_latency
-                0.2,   // cached_layers
-                0.1,   // kv_pages
-                0.55   // pressure_score
-            };
+                50.0,  // storage_latency
+                5,     // cached_layers
+                20     // kv_pages
+            );
+            double[] testFeatures = extractor.extractNormalized(state);
+
 
             Decision prediction = nn.predict(testFeatures);
             assert prediction.action() != null : "Prediction returned null action";
