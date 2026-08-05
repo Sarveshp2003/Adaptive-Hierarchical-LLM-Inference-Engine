@@ -15,6 +15,7 @@ public final class NativeInferenceEngine {
     
     private volatile boolean initialized = false;
     private volatile int vocabSize = -1;
+    private volatile int eosToken = -1;
 
     /**
      * Initialize the native inference engine.
@@ -24,8 +25,9 @@ public final class NativeInferenceEngine {
         if (!initialized) {
             nativeInitialize();
             this.vocabSize = nativeGetVocabSize();
+            this.eosToken = nativeGetEosToken();
             this.initialized = true;
-            System.out.println("[NativeInferenceEngine] Initialized with vocab_size=" + vocabSize);
+            System.out.println("[NativeInferenceEngine] Initialized with vocab_size=" + vocabSize + " eos_token=" + eosToken);
         }
     }
 
@@ -36,34 +38,63 @@ public final class NativeInferenceEngine {
      * @return Array of token IDs
      * @throws RuntimeException if tokenization fails
      */
-    public int[] tokenize(String text) {
+    public int[] tokenize(String text) throws RuntimeException {
         if (!initialized) {
             throw new IllegalStateException("Engine not initialized");
         }
-        
+
         if (text == null || text.isEmpty()) {
             return new int[0];
         }
-        
-        // Allocate buffer for tokens (estimate: ~1.3 tokens per word)
-        int maxTokens = Math.max(10, (int)(text.split("\\s+").length * 1.5));
-        int[] tokens = new int[maxTokens];
-        
-        // Call native tokenize
-        int tokenCount = nativeTokenize(text, tokens, maxTokens);
-        
-        if (tokenCount < 0) {
-            throw new RuntimeException("Tokenization failed for: " + text);
+
+        // Estimate tokens and retry with exponential backoff if buffer is too small.
+        int words = Math.max(1, text.split("\\s+").length);
+        int maxTokens = Math.min(1024, Math.max(10, words * 2)); // start conservatively
+        final int MAX_CAP = 65536;
+        int attempts = 0;
+
+        while (attempts < 6) {
+            int[] tokens = new int[maxTokens];
+            int tokenCount = nativeTokenize(text, tokens, maxTokens);
+
+            if (tokenCount < 0) {
+                // Native returned negative: -N means N tokens required. Try to resize exactly if possible.
+                int required = -tokenCount;
+                if (required > 0 && required <= MAX_CAP && required > maxTokens) {
+                    maxTokens = Math.min(required + 8, MAX_CAP); // add small slack
+                    attempts++;
+                    continue;
+                }
+
+                // Otherwise fall back to exponential growth
+                if (maxTokens < MAX_CAP) {
+                    maxTokens = Math.min(maxTokens * 2, MAX_CAP);
+                    attempts++;
+                    continue;
+                }
+
+                throw new RuntimeException(ErrorCode.JNI_ERROR, "Tokenization failed for: " + text);
+            }
+
+            // If tokenCount equals or exceeds buffer, assume truncation and retry with larger buffer
+            if (tokenCount >= maxTokens && maxTokens < MAX_CAP) {
+                maxTokens = Math.min(maxTokens * 2, MAX_CAP);
+                attempts++;
+                continue;
+            }
+
+            // Success: trim to actual size
+            if (tokenCount < maxTokens) {
+                int[] result = new int[tokenCount];
+                System.arraycopy(tokens, 0, result, 0, tokenCount);
+                return result;
+            }
+
+            // tokenCount == maxTokens but at cap — return as-is
+            return tokens;
         }
-        
-        // Trim array to actual token count
-        if (tokenCount < maxTokens) {
-            int[] result = new int[tokenCount];
-            System.arraycopy(tokens, 0, result, 0, tokenCount);
-            return result;
-        }
-        
-        return tokens;
+
+        throw new RuntimeException(ErrorCode.JNI_ERROR, "Tokenization failed (exceeded retries) for: " + text);
     }
 
     /**
@@ -73,7 +104,7 @@ public final class NativeInferenceEngine {
      * @return Reconstructed text
      * @throws RuntimeException if detokenization fails
      */
-    public String detokenize(int[] tokens) {
+    public String detokenize(int[] tokens) throws RuntimeException {
         if (!initialized) {
             throw new IllegalStateException("Engine not initialized");
         }
@@ -88,7 +119,7 @@ public final class NativeInferenceEngine {
         int bytesWritten = nativeDetokenize(tokens, tokens.length, outputBuffer, outputBuffer.length);
         
         if (bytesWritten < 0) {
-            throw new RuntimeException("Detokenization failed");
+            throw new RuntimeException(ErrorCode.JNI_ERROR, "Detokenization failed");
         }
         
         return new String(outputBuffer, 0, bytesWritten, java.nio.charset.StandardCharsets.UTF_8);
@@ -102,7 +133,7 @@ public final class NativeInferenceEngine {
      * @return Prediction result with next token and logits
      * @throws RuntimeException if inference fails
      */
-    public InferencePrediction infer(int[] inputTokens) {
+    public InferencePrediction infer(int[] inputTokens) throws RuntimeException {
         if (!initialized) {
             throw new IllegalStateException("Engine not initialized");
         }
@@ -122,7 +153,7 @@ public final class NativeInferenceEngine {
         int nextToken = nativeInfer(inputTokens, inputTokens.length, logits, vocabSize);
         
         if (nextToken < 0) {
-            throw new RuntimeException("Inference failed");
+            throw new RuntimeException(ErrorCode.JNI_ERROR, "Inference failed");
         }
         
         return new InferencePrediction(nextToken, logits);
@@ -136,7 +167,7 @@ public final class NativeInferenceEngine {
      * @return Average negative log likelihood (perplexity metric)
      * @throws RuntimeException if computation fails
      */
-    public double computePerplexity(int[] tokens) {
+    public double computePerplexity(int[] tokens) throws RuntimeException {
         if (!initialized) {
             throw new IllegalStateException("Engine not initialized");
         }
@@ -148,7 +179,7 @@ public final class NativeInferenceEngine {
         double perplexity = nativeComputePerplexity(tokens, tokens.length);
         
         if (perplexity < 0) {
-            throw new RuntimeException("Perplexity computation failed");
+            throw new RuntimeException(ErrorCode.JNI_ERROR, "Perplexity computation failed");
         }
         
         return perplexity;
@@ -169,6 +200,14 @@ public final class NativeInferenceEngine {
      */
     public boolean isInitialized() {
         return initialized;
+    }
+
+    /**
+     * Get EOS token id as reported by native engine. May be -1 if unavailable.
+     */
+    public int getEosToken() {
+        if (!initialized) throw new IllegalStateException("Engine not initialized");
+        return eosToken;
     }
 
     /**
@@ -282,6 +321,7 @@ public final class NativeInferenceEngine {
     private native int nativeDetokenize(int[] tokens, int tokenCount, byte[] outputText, int maxLen);
     
     private native int nativeGetVocabSize();
+    private native int nativeGetEosToken();
     private native int nativeInfer(int[] inputTokens, int tokenCount, float[] logitsOut, int maxLogits);
     private native double nativeComputePerplexity(int[] tokens, int tokenCount);
 

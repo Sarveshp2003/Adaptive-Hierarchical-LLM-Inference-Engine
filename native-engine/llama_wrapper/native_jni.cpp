@@ -9,6 +9,7 @@ extern "C" {
     int adaptive_engine_tokenize(const char* text, int* output_tokens, int max_tokens);
     int adaptive_engine_detokenize(const int* tokens, int token_count, char* output_text, int max_len);
     int adaptive_engine_get_vocab_size();
+    int adaptive_engine_get_eos_token();
     int adaptive_engine_infer(const int* input_tokens, int token_count, float* logits_out, int max_logits);
     double adaptive_engine_compute_perplexity(const int* tokens, int token_count);
     typedef struct NativeEngineApi {
@@ -33,6 +34,11 @@ JNIEXPORT void JNICALL Java_com_adaptivellm_runtime_NativeInferenceEngine_native
 
 JNIEXPORT jint JNICALL Java_com_adaptivellm_runtime_NativeInferenceEngine_nativeGetVocabSize(JNIEnv* env, jobject obj) {
     int v = adaptive_engine_get_vocab_size();
+    return (jint)v;
+}
+
+JNIEXPORT jint JNICALL Java_com_adaptivellm_runtime_NativeInferenceEngine_nativeGetEosToken(JNIEnv* env, jobject obj) {
+    int v = adaptive_engine_get_eos_token();
     return (jint)v;
 }
 

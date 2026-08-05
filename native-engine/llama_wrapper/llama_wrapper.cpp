@@ -457,8 +457,8 @@ extern "C" {
         std::cout << "[llama_wrapper] tokenizing input (len=" << text_len << ")..." << std::endl;
         int32_t n = llama_tokenize(vocab, text, text_len, tokens.data(), max_tokens, true, true);
         if (n < 0) {
-            // llama_tokenize returns -N when provided buffer is too small. Fall back to the
-            // higher-level tokenize() which returns the full vector, then clip to max_tokens.
+            // llama_tokenize returns -N when provided buffer is too small. Retry with the
+            // required buffer size as reported by llama_tokenize.
             std::cerr << "[llama_wrapper] llama_tokenize returned " << n << " for input len=" << text_len << ". Retrying with larger buffer. Text: '" << text << "'\n";
             int required = -n;
             std::vector<llama_token> tokens2(required);
@@ -482,6 +482,26 @@ extern "C" {
         return count;
 #endif
         return -1;
+    }
+
+    // Expose EOS token id from model metadata (if available)
+    ADAPTIVE_ENGINE_EXPORT int adaptive_engine_get_eos_token() {
+#ifdef HAVE_LLAMA
+        if (!g_model) return -1;
+        char buf[64] = {0};
+        int rc = llama_model_meta_val_str(g_model, "tokenizer.ggml.eos_token_id", buf, sizeof(buf));
+        if (rc <= 0) {
+            // fallback: try common metadata key 'tokenizer.ggml.eos_token_id' not present as string
+            // try numeric retrieval via model meta by index is not necessary here; return -1
+            return -1;
+        }
+        // parse integer safely using C API
+        int val = atoi(buf);
+        if (val == 0 && (buf[0] != '0')) return -1;
+        return val;
+#else
+        return -1;
+#endif
     }
 
     /**
