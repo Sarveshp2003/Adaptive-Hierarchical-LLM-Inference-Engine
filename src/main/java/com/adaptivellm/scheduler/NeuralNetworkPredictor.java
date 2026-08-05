@@ -19,9 +19,9 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
     private static final long serialVersionUID = 1L;
 
     // Network dimensions
-    private static final int INPUT_SIZE = 8;
-    private static final int HIDDEN_SIZE_1 = 32;
-    private static final int HIDDEN_SIZE_2 = 16;
+    private static final int INPUT_SIZE = 12;
+    private static final int HIDDEN_SIZE_1 = 48;
+    private static final int HIDDEN_SIZE_2 = 24;
     private static final int OUTPUT_SIZE = 8;
 
     // Weights and biases
@@ -33,10 +33,10 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
     private double[] b3;
 
     // Training hyperparameters
-    private double learningRate = 0.01;
-    private double regularization = 0.001;
-    private int epochs = 100;
-    private int batchSize = 32;
+    private double learningRate = 0.001;
+    private double regularization = 0.0005;
+    private int epochs = 250;
+    private int batchSize = 64;
 
     // Statistics
     private int trainingSamples = 0;
@@ -166,11 +166,18 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
         System.out.println("Starting training on " + samples.size() + " samples");
 
         FeatureExtractor extractor = new FeatureExtractor();
+        Map<SchedulerAction, Integer> classCounts = new HashMap<>();
+        for (SchedulerAction action : SchedulerAction.values()) {
+            classCounts.put(action, 0);
+        }
+        for (TrainingSample sample : samples) {
+            classCounts.put(sample.decision().action(), classCounts.get(sample.decision().action()) + 1);
+        }
 
         for (int epoch = 0; epoch < epochs; epoch++) {
             double epochLoss = 0.0;
+            double totalWeight = 0.0;
 
-            // Mini-batch gradient descent
             for (int batch = 0; batch < samples.size(); batch += batchSize) {
                 int batchEnd = Math.min(batch + batchSize, samples.size());
 
@@ -179,23 +186,20 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
                     double[] features = extractor.extractNormalized(sample.state());
                     Decision decision = sample.decision();
 
-                    // Forward pass
                     double[] pred = predictRaw(features);
-
-                    // Target: one-hot encoding for action
                     double[] target = new double[OUTPUT_SIZE];
                     target[actionToIndex(decision.action())] = 1.0;
 
-                    // Calculate loss (cross-entropy)
-                    double loss = crossEntropyLoss(pred, target);
+                    double weight = (double) trainingSamples / (OUTPUT_SIZE * Math.max(1, classCounts.getOrDefault(decision.action(), 1)));
+                    double loss = crossEntropyLoss(pred, target) * weight;
                     epochLoss += loss;
+                    totalWeight += weight;
 
-                    // Backprop (full gradient descent)
-                    updateWeights(features, pred, target);
+                    updateWeights(features, pred, target, weight);
                 }
             }
 
-            epochLoss /= samples.size();
+            epochLoss = totalWeight > 0 ? epochLoss / totalWeight : epochLoss;
             lastLoss = epochLoss;
 
             if ((epoch + 1) % 10 == 0) {
@@ -218,13 +222,12 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
         double[] target = new double[OUTPUT_SIZE];
         target[actionToIndex(decision.action())] = 1.0;
 
-        double prevLoss = 0.0;
         for (int i = 0; i < iterations; i++) {
             double[] pred = predictRaw(features);
             double loss = crossEntropyLoss(pred, target);
-            updateWeights(features, pred, target);
+            double weight = 1.0 / Math.max(1.0, trainingSamples > 0 ? trainingSamples : 1);
+            updateWeights(features, pred, target, weight);
 
-            if (i == 0) prevLoss = loss;
             if ((i + 1) % Math.max(1, iterations / 5) == 0) {
                 System.out.println("  Incremental epoch " + (i + 1) + "/" + iterations + " - Loss: " + String.format("%.6f", loss));
             }
@@ -246,12 +249,18 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
         System.out.println("Starting weighted training on " + samples.size() + " samples (useOutcome=" + useOutcome + ")");
 
         FeatureExtractor extractor = new FeatureExtractor();
+        Map<SchedulerAction, Integer> classCounts = new HashMap<>();
+        for (SchedulerAction action : SchedulerAction.values()) {
+            classCounts.put(action, 0);
+        }
+        for (TrainingSample sample : samples) {
+            classCounts.put(sample.decision().action(), classCounts.get(sample.decision().action()) + 1);
+        }
 
         for (int epoch = 0; epoch < epochs; epoch++) {
             double epochLoss = 0.0;
             double totalWeight = 0.0;
 
-            // Mini-batch gradient descent
             for (int batch = 0; batch < samples.size(); batch += batchSize) {
                 int batchEnd = Math.min(batch + batchSize, samples.size());
 
@@ -260,31 +269,23 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
                     double[] features = extractor.extractNormalized(sample.state());
                     Decision decision = sample.decision();
 
-                    // Calculate sample weight based on outcome
                     double weight = 1.0;
                     if (useOutcome) {
-                        // Normalize latency improvement to [0, 2] range (1.0 is baseline)
                         weight = 1.0 + (sample.latencyImprovement() / 100.0);
                         weight = Math.max(0.1, Math.min(2.0, weight));
                     }
+                    double classWeight = 1.0 / Math.max(1.0, classCounts.getOrDefault(decision.action(), 1));
+                    double effectiveWeight = weight * classWeight;
 
-                    // Forward pass
                     double[] pred = predictRaw(features);
-
-                    // Target: one-hot encoding for action
                     double[] target = new double[OUTPUT_SIZE];
                     target[actionToIndex(decision.action())] = 1.0;
 
-                    // Calculate weighted loss
-                    double loss = crossEntropyLoss(pred, target) * weight;
+                    double loss = crossEntropyLoss(pred, target) * effectiveWeight;
                     epochLoss += loss;
-                    totalWeight += weight;
+                    totalWeight += effectiveWeight;
 
-                    // Weighted backprop (scale gradient by weight)
-                    double originalLR = learningRate;
-                    learningRate *= weight;
-                    updateWeights(features, pred, target);
-                    learningRate = originalLR;
+                    updateWeights(features, pred, target, effectiveWeight);
                 }
             }
 
@@ -350,7 +351,9 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
     /**
      * Full backpropagation through all layers with gradient descent.
      */
-    private void updateWeights(double[] features, double[] pred, double[] target) {
+    private void updateWeights(double[] features, double[] pred, double[] target, double sampleWeight) {
+        double effectiveLearningRate = learningRate * sampleWeight;
+
         // Forward pass: save activations for backprop
         double[] h1 = forward(features, w1, b1, true);
         double[] h2 = forward(h1, w2, b2, true);
@@ -375,15 +378,14 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
         for (int i = 0; i < HIDDEN_SIZE_2; i++) {
             for (int j = 0; j < OUTPUT_SIZE; j++) {
                 double gradient = outputError[j] * h2[i];
-                w3[i][j] -= learningRate * (gradient + regularization * w3[i][j]);
+                w3[i][j] -= effectiveLearningRate * (gradient + regularization * w3[i][j]);
             }
         }
         for (int j = 0; j < OUTPUT_SIZE; j++) {
-            b3[j] -= learningRate * outputError[j];
+            b3[j] -= effectiveLearningRate * outputError[j];
         }
 
         // ===== BACKPROP LAYER 2: Hidden2 -> Hidden1 =====
-        // Apply ReLU derivative: gradient only flows where activation > 0
         double[] h2Error = new double[HIDDEN_SIZE_2];
         for (int i = 0; i < HIDDEN_SIZE_2; i++) {
             h2Error[i] = h2[i] > 0 ? h2GradInput[i] : 0.0;
@@ -400,15 +402,14 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
         for (int i = 0; i < HIDDEN_SIZE_1; i++) {
             for (int j = 0; j < HIDDEN_SIZE_2; j++) {
                 double gradient = h2Error[j] * h1[i];
-                w2[i][j] -= learningRate * (gradient + regularization * w2[i][j]);
+                w2[i][j] -= effectiveLearningRate * (gradient + regularization * w2[i][j]);
             }
         }
         for (int j = 0; j < HIDDEN_SIZE_2; j++) {
-            b2[j] -= learningRate * h2Error[j];
+            b2[j] -= effectiveLearningRate * h2Error[j];
         }
 
         // ===== BACKPROP LAYER 1: Hidden1 -> Input =====
-        // Apply ReLU derivative
         double[] h1Error = new double[HIDDEN_SIZE_1];
         for (int i = 0; i < HIDDEN_SIZE_1; i++) {
             h1Error[i] = h1[i] > 0 ? h1GradInput[i] : 0.0;
@@ -418,11 +419,11 @@ public final class NeuralNetworkPredictor implements PredictorModel, Serializabl
         for (int i = 0; i < INPUT_SIZE; i++) {
             for (int j = 0; j < HIDDEN_SIZE_1; j++) {
                 double gradient = h1Error[j] * features[i];
-                w1[i][j] -= learningRate * (gradient + regularization * w1[i][j]);
+                w1[i][j] -= effectiveLearningRate * (gradient + regularization * w1[i][j]);
             }
         }
         for (int j = 0; j < HIDDEN_SIZE_1; j++) {
-            b1[j] -= learningRate * h1Error[j];
+            b1[j] -= effectiveLearningRate * h1Error[j];
         }
     }
 

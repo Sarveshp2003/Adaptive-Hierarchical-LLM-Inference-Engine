@@ -1,5 +1,12 @@
 package com.adaptivellm.runtime;
 
+import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.Arrays;
+import java.util.regex.Pattern;
+
 /**
  * JNI wrapper for native inference engine with tokenization and real model inference.
  * 
@@ -12,22 +19,134 @@ package com.adaptivellm.runtime;
  * - Perplexity computation (convergence metric)
  */
 public final class NativeInferenceEngine {
+
+    private static final String NATIVE_LIB_NAME = "adaptive_engine";
+    private static volatile boolean nativeLibraryLoaded = false;
     
     private volatile boolean initialized = false;
     private volatile int vocabSize = -1;
     private volatile int eosToken = -1;
+
+    static {
+        loadNativeLibrary();
+    }
+
+    /**
+     * Try loading common dependency DLLs from the same directory.
+     */
+    private static void tryLoadDependencies(Path dllDir) {
+        String[] dependencies = { "llama.dll", "adaptive_engine_llama.dll" };
+        for (String dep : dependencies) {
+            Path depPath = dllDir.resolve(dep);
+            if (Files.isRegularFile(depPath)) {
+                try {
+                    System.load(depPath.toAbsolutePath().toString());
+                    System.out.println("[NativeInferenceEngine] debug: loaded dependency " + depPath.toAbsolutePath());
+                } catch (UnsatisfiedLinkError e) {
+                    System.out.println("[NativeInferenceEngine] debug: could not load dependency " + depPath.toAbsolutePath() + ": " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    private static void loadNativeLibrary() {
+        if (nativeLibraryLoaded) {
+            return;
+        }
+
+        try {
+            System.loadLibrary(NATIVE_LIB_NAME);
+            nativeLibraryLoaded = true;
+            return;
+        } catch (UnsatisfiedLinkError ignored) {
+            // Fall back to a few common build output locations.
+        }
+
+        String libraryName = System.mapLibraryName(NATIVE_LIB_NAME);
+        Path userDir = Paths.get(System.getProperty("user.dir", "")).toAbsolutePath().normalize();
+        // Try Release directory first (most likely to have all dependencies)
+        Path[] candidateRoots = new Path[] {
+                userDir.resolve("native-engine").resolve("llama_wrapper").resolve("build").resolve("lib").resolve("Release"),
+                userDir.resolve("native-engine").resolve("llama_wrapper").resolve("build").resolve("bin").resolve("Release"),
+                userDir.resolve("native-engine").resolve("llama_wrapper").resolve("build").resolve("lib"),
+                userDir.resolve("native-engine").resolve("llama_wrapper").resolve("build").resolve("bin"),
+                userDir.resolve("native-engine").resolve("llama_wrapper").resolve("build"),
+                userDir,
+                userDir.resolve("lib"),
+                userDir.resolve("target").resolve("classes")
+        };
+
+        String javaLibraryPath = System.getProperty("java.library.path", "");
+        System.out.println("[NativeInferenceEngine] debug: user.dir=" + System.getProperty("user.dir") + " java.library.path=" + javaLibraryPath + " ADAPTIVELLM_NATIVE_LIB=" + System.getenv("ADAPTIVELLM_NATIVE_LIB"));
+        if (!javaLibraryPath.isEmpty()) {
+            for (String entry : javaLibraryPath.split(Pattern.quote(File.pathSeparator))) {
+                if (entry == null || entry.isBlank()) {
+                    continue;
+                }
+                candidateRoots = Arrays.copyOf(candidateRoots, candidateRoots.length + 1);
+                candidateRoots[candidateRoots.length - 1] = Paths.get(entry).toAbsolutePath().normalize();
+            }
+        }
+
+        for (Path root : candidateRoots) {
+            if (root == null) {
+                continue;
+            }
+            Path candidate = root.resolve(libraryName);
+            System.out.println("[NativeInferenceEngine] debug: checking candidate=" + candidate.toAbsolutePath());
+            if (Files.isRegularFile(candidate)) {
+                System.out.println("[NativeInferenceEngine] debug: found file at " + candidate.toAbsolutePath());
+                try {
+                    // Try loading dependencies first (llama.dll, etc.)
+                    tryLoadDependencies(root);
+                    System.load(candidate.toAbsolutePath().toString());
+                    nativeLibraryLoaded = true;
+                    System.out.println("[NativeInferenceEngine] debug: System.load succeeded for " + candidate.toAbsolutePath());
+                    return;
+                } catch (UnsatisfiedLinkError ignored2) {
+                    System.err.println("[NativeInferenceEngine] debug: System.load failed for " + candidate.toAbsolutePath() + " -> " + ignored2.getMessage());
+                    // Try the next candidate.
+                }
+            }
+        }
+
+        // Final fallback: allow explicit absolute path via ADAPTIVELLM_NATIVE_LIB env var
+        String explicit = System.getenv("ADAPTIVELLM_NATIVE_LIB");
+        if (explicit != null && !explicit.isBlank()) {
+            try {
+                Path p = Paths.get(explicit).toAbsolutePath().normalize();
+                if (Files.isRegularFile(p)) {
+                    try {
+                        System.load(p.toString());
+                        nativeLibraryLoaded = true;
+                        return;
+                    } catch (UnsatisfiedLinkError ignored3) {
+                        // fallthrough to error
+                    }
+                }
+            } catch (Exception ex) {
+                // ignore and fall through to error below
+            }
+        }
+
+        throw new UnsatisfiedLinkError("Unable to locate native library '" + libraryName + "' in java.library.path or common build directories");
+    }
 
     /**
      * Initialize the native inference engine.
      * Must be called before any inference operations.
      */
     public void initialize() {
+        initialize(true);
+    }
+
+    public void initialize(boolean enableGpu) {
         if (!initialized) {
-            nativeInitialize();
+            nativeInitialize(enableGpu);
             this.vocabSize = nativeGetVocabSize();
             this.eosToken = nativeGetEosToken();
             this.initialized = true;
-            System.out.println("[NativeInferenceEngine] Initialized with vocab_size=" + vocabSize + " eos_token=" + eosToken);
+            System.out.println("[NativeInferenceEngine] Initialized with vocab_size=" + vocabSize + " eos_token=" + eosToken + " gpu_enabled=" + enableGpu);
         }
     }
 
@@ -50,18 +169,23 @@ public final class NativeInferenceEngine {
         // Estimate tokens and retry with exponential backoff if buffer is too small.
         int words = Math.max(1, text.split("\\s+").length);
         int maxTokens = Math.min(1024, Math.max(10, words * 2)); // start conservatively
-        final int MAX_CAP = 65536;
+        final int MAX_CAP = 262144; // allow much larger temporary buffers for pathological cases
         int attempts = 0;
 
-        while (attempts < 6) {
+        while (attempts < 12) {
             int[] tokens = new int[maxTokens];
             int tokenCount = nativeTokenize(text, tokens, maxTokens);
 
             if (tokenCount < 0) {
                 // Native returned negative: -N means N tokens required. Try to resize exactly if possible.
                 int required = -tokenCount;
-                if (required > 0 && required <= MAX_CAP && required > maxTokens) {
-                    maxTokens = Math.min(required + 8, MAX_CAP); // add small slack
+                System.out.println("[NativeInferenceEngine] tokenize: native returned negative (" + tokenCount + ") => required=" + required + " (buffer=" + maxTokens + ")");
+                // Defensive: if native reports non-positive or a required size <= current buffer, treat as error.
+                if (required <= 0 || required <= maxTokens) {
+                    throw new RuntimeException(ErrorCode.JNI_ERROR, "Tokenization failed (native returned " + tokenCount + ") for: " + text);
+                }
+                if (required <= MAX_CAP) {
+                    maxTokens = Math.min(required + 16, MAX_CAP); // add slack
                     attempts++;
                     continue;
                 }
@@ -73,11 +197,12 @@ public final class NativeInferenceEngine {
                     continue;
                 }
 
-                throw new RuntimeException(ErrorCode.JNI_ERROR, "Tokenization failed for: " + text);
+                throw new RuntimeException(ErrorCode.JNI_ERROR, "Tokenization failed (native required=" + required + ") for: " + text);
             }
 
             // If tokenCount equals or exceeds buffer, assume truncation and retry with larger buffer
             if (tokenCount >= maxTokens && maxTokens < MAX_CAP) {
+                System.out.println("[NativeInferenceEngine] tokenize: tokenCount >= buffer (" + tokenCount + "), growing buffer from " + maxTokens);
                 maxTokens = Math.min(maxTokens * 2, MAX_CAP);
                 attempts++;
                 continue;
@@ -314,7 +439,85 @@ public final class NativeInferenceEngine {
 
     // ============ Native JNI Calls ============
 
+    public long prefetchLayer(int layerId) {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativePrefetchLayer(layerId);
+    }
+
+    public long evictLayer(int layerId) {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativeEvictLayer(layerId);
+    }
+
+    public long keepLayer(int layerId) {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativeKeepLayer(layerId);
+    }
+
+    public long moveKvToRam(long kvPageId) {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativeMoveKvToRam(kvPageId);
+    }
+
+    public long moveKvToGpu(long kvPageId) {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativeMoveKvToGpu(kvPageId);
+    }
+
+    public long compressKv(long kvPageId) {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativeCompressKv(kvPageId);
+    }
+
+    public long offloadKv(long kvPageId) {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativeOffloadKv(kvPageId);
+    }
+
+    public int getCurrentLayer() {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativeGetCurrentLayer();
+    }
+
+    public long getGpuMemory() {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativeGetGpuMemory();
+    }
+
+    public int getKvPages() {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativeGetKvPages();
+    }
+
+    public int getCachedLayers() {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        return nativeGetCachedLayers();
+    }
+
     private native void nativeInitialize();
+    private native void nativeInitialize(boolean enableGpu);
     private native void nativeShutdown();
     
     private native int nativeTokenize(String text, int[] outputTokens, int maxTokens);
@@ -324,12 +527,15 @@ public final class NativeInferenceEngine {
     private native int nativeGetEosToken();
     private native int nativeInfer(int[] inputTokens, int tokenCount, float[] logitsOut, int maxLogits);
     private native double nativeComputePerplexity(int[] tokens, int tokenCount);
-
-    static {
-        try {
-            System.loadLibrary("adaptive_engine");
-        } catch (UnsatisfiedLinkError e) {
-            System.err.println("Warning: Failed to load adaptive_engine native library: " + e.getMessage());
-        }
-    }
+    private native long nativePrefetchLayer(int layerId);
+    private native long nativeEvictLayer(int layerId);
+    private native long nativeKeepLayer(int layerId);
+    private native long nativeMoveKvToRam(long kvPageId);
+    private native long nativeMoveKvToGpu(long kvPageId);
+    private native long nativeCompressKv(long kvPageId);
+    private native long nativeOffloadKv(long kvPageId);
+    private native int nativeGetCurrentLayer();
+    private native long nativeGetGpuMemory();
+    private native int nativeGetKvPages();
+    private native int nativeGetCachedLayers();
 }

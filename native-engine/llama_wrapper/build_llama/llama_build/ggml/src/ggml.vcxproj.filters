@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="E:\adaptivellm\native-engine\llama_wrapper\llama.cpp\ggml\src\ggml-backend-dl.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="E:\adaptivellm\native-engine\llama_wrapper\llama.cpp\ggml\src\ggml-backend-reg.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="E:\adaptivellm\native-engine\llama_wrapper\llama.cpp\ggml\src\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{FB4D27BB-0A2F-3943-B858-9FE7897B926E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

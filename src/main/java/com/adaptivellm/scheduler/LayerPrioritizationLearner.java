@@ -161,18 +161,13 @@ public final class LayerPrioritizationLearner {
         double convergenceImprovement
     ) {
         // Update layer metrics based on decision
-        Decision.Layer[] actionLayers = decision.decision().layers();
-        if (actionLayers != null) {
-            for (Decision.Layer layer : actionLayers) {
-                recordLayerAccess(
-                    layer.layerId(),
-                    0,  // Latency tracked at higher level
-                    memorySaved / actionLayers.length,
-                    convergenceImprovement / actionLayers.length,
-                    false
-                );
-            }
-        }
+        recordLayerAccess(
+            (int) decision.decision().targetId(),
+            0,
+            memorySaved,
+            convergenceImprovement,
+            false
+        );
         
         recentSamples.addLast(decision.sample());
         if (recentSamples.size() > maxHistorySize) {

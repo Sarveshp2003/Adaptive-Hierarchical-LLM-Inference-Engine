@@ -102,45 +102,34 @@ public final class FeatureExtractor {
     ) {
 
 
+        double normalizedLayer = normalizeLayer(state.currentLayer());
+        double normalizedToken = normalizeToken(state.currentToken());
+        double normalizedLatency = normalizeLatency(state.storageLatency());
+        double normalizedCached = normalizeCount(state.cachedLayers());
+        double normalizedKv = normalizeCount(state.kvPages());
+
+        double gpuRamInteraction = Math.min(state.gpuUsage() * state.ramUsage(), 1.0);
+        double cacheRatio = state.cachedLayers() > 0
+                ? Math.min(state.cachedLayers() / (double) Math.max(1, state.kvPages()), 1.0)
+                : 0.0;
+        double layerTokenInteraction = Math.min(normalizedLayer * normalizedToken, 1.0);
+        double latencyPressureInteraction = Math.min(normalizedLatency * state.pressureScore(), 1.0);
+
         return new double[]{
-
-
-                normalizeLayer(
-                        state.currentLayer()
-                ),
-
-
-                normalizeToken(
-                        state.currentToken()
-                ),
-
-
+                normalizedLayer,
+                normalizedToken,
                 state.gpuUsage(),
-
-
                 state.ramUsage(),
-
-
-                normalizeLatency(
-                        state.storageLatency()
-                ),
-
-
-                normalizeCount(
-                        state.cachedLayers()
-                ),
-
-
-                normalizeCount(
-                        state.kvPages()
-                ),
-
-
-                state.pressureScore()
-
+                normalizedLatency,
+                normalizedCached,
+                normalizedKv,
+                state.pressureScore(),
+                gpuRamInteraction,
+                cacheRatio,
+                layerTokenInteraction,
+                latencyPressureInteraction
         };
     }
-
 
 
 

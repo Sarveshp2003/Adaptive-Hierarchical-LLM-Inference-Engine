@@ -20,6 +20,8 @@ public final class SchedulerRuntimeController {
     private final NativeEngineAdapter nativeAdapter;
     private final MemoryStateProvider stateProvider;
     private final PerformanceMetrics metrics;
+    private final ModelPersistence modelPersistence;
+    private final String modelName;
 
     private volatile boolean running = false;
     private Thread controlThread = null;
@@ -39,10 +41,22 @@ public final class SchedulerRuntimeController {
             NativeEngineAdapter nativeAdapter,
             MemoryStateProvider stateProvider
     ) {
+        this(scheduler, nativeAdapter, stateProvider, null, null);
+    }
+
+    public SchedulerRuntimeController(
+            AdaptiveScheduler scheduler,
+            NativeEngineAdapter nativeAdapter,
+            MemoryStateProvider stateProvider,
+            ModelPersistence modelPersistence,
+            String modelName
+    ) {
         this.scheduler = Objects.requireNonNull(scheduler);
         this.nativeAdapter = Objects.requireNonNull(nativeAdapter);
         this.stateProvider = Objects.requireNonNull(stateProvider);
         this.metrics = new PerformanceMetrics();
+        this.modelPersistence = modelPersistence;
+        this.modelName = modelName;
     }
 
     /**
@@ -56,6 +70,7 @@ public final class SchedulerRuntimeController {
 
         running = true;
         nativeAdapter.start();
+        loadPersistedModelIfAvailable();
 
         controlThread = new Thread(() -> {
             System.out.println("[SchedulerController] Control loop started");
@@ -121,6 +136,25 @@ public final class SchedulerRuntimeController {
 
         controlThread.setDaemon(false);
         controlThread.start();
+    }
+
+    /**
+     * Load a persisted model into the scheduler if configured.
+     */
+    public void loadPersistedModelIfAvailable() {
+        if (modelPersistence == null) {
+            return;
+        }
+
+        try {
+            if (modelName != null && !modelName.isBlank()) {
+                scheduler.reloadModelFromDisk(modelName, modelPersistence);
+            } else {
+                scheduler.reloadLatestModelFromDisk(modelPersistence);
+            }
+        } catch (Exception e) {
+            System.err.println("[SchedulerController] Could not load persisted model: " + e.getMessage());
+        }
     }
 
     /**
@@ -209,6 +243,10 @@ public final class SchedulerRuntimeController {
     }
 
     // --- Metrics and Monitoring ---
+
+    public AdaptiveScheduler getScheduler() {
+        return scheduler;
+    }
 
     public boolean isRunning() {
         return running;

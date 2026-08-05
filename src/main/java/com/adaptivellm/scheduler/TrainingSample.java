@@ -3,6 +3,7 @@ package com.adaptivellm.scheduler;
 
 
 import java.time.Instant;
+import java.util.Arrays;
 
 
 
@@ -17,6 +18,9 @@ public final class TrainingSample {
 
 
     private final Decision decision;
+
+
+    private final double[] features;
 
 
 
@@ -38,6 +42,17 @@ public final class TrainingSample {
             Decision decision
     )
     {
+        this(state, decision, null);
+    }
+
+
+
+    public TrainingSample(
+            MemoryState state,
+            Decision decision,
+            double[] features
+    )
+    {
 
         this.state =
                 state;
@@ -45,6 +60,12 @@ public final class TrainingSample {
 
         this.decision =
                 decision;
+
+
+        this.features =
+                features == null
+                        ? null
+                        : Arrays.copyOf(features, features.length);
 
 
         this.timestamp =
@@ -64,6 +85,15 @@ public final class TrainingSample {
     public Decision decision()
     {
         return decision;
+    }
+
+
+
+    public double[] features()
+    {
+        return features == null
+                ? null
+                : Arrays.copyOf(features, features.length);
     }
 
 

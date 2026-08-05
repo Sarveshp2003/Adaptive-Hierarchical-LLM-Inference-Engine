@@ -5,8 +5,11 @@
 #include <vector>
 #include <mutex>
 #include <fstream>
+#include <string>
+#include <cctype>
 #include <errno.h>
 #include <cstring>
+#include <algorithm>
 
 #ifdef HAVE_LLAMA
 // When built with the llama submodule, include public headers here (optional)
@@ -53,11 +56,48 @@ extern "C" {
     static std::mutex g_cache_mutex;
 #endif
 
+    static bool should_use_gpu() {
+        const char* env = std::getenv("ADAPTIVELLM_ENABLE_GPU");
+        if (!env || !*env) {
+            return true;
+        }
+        std::string value(env);
+        std::transform(value.begin(), value.end(), value.begin(), [](unsigned char c) {
+            return static_cast<char>(std::tolower(c));
+        });
+        return value != "0" && value != "false" && value != "off" && value != "no";
+    }
+
+    static int get_gpu_layer_count() {
+        const char* env = std::getenv("ADAPTIVELLM_GPU_LAYERS");
+        if (!env || !*env) {
+            return should_use_gpu() ? 999 : 0;
+        }
+        try {
+            int value = std::stoi(env);
+            return std::max(0, value);
+        } catch (const std::exception&) {
+            return should_use_gpu() ? 999 : 0;
+        }
+    }
+
+    static void initialize_gpu_backend() {
+#ifdef HAVE_LLAMA
+        if (!should_use_gpu()) {
+            std::cout << "[llama_wrapper] GPU disabled via ADAPTIVELLM_ENABLE_GPU\n";
+            return;
+        }
+        llama_backend_init();
+        std::cout << "[llama_wrapper] initialized llama backend for GPU execution\n";
+#endif
+    }
+
     static void lw_start() {
 #ifdef HAVE_LLAMA
         const char * path = getenv("LLAMA_MODEL_PATH");
         if (path && !g_model) {
             std::cout << "[llama_wrapper] attempting to load model: " << path << "\n";
+            initialize_gpu_backend();
             // Verify file exists and is readable
             std::ifstream f(path, std::ios::binary | std::ios::ate);
             if (!f) {
@@ -89,9 +129,13 @@ extern "C" {
                 struct llama_context_params cparams = llama_context_default_params();
                 cparams.n_ctx = 1024;  // 1K context window for now
                 cparams.n_batch = 256;
+                // Some llama.cpp versions don't expose n_gpu_layers in llama_context_params.
+                // We avoid assigning it directly to maintain compatibility; the GPU backend will still
+                // be initialized based on ADAPTIVELLM_ENABLE_GPU and environment.
                 g_context = llama_init_from_model(g_model, cparams);
                 if (g_context) {
-                    std::cout << "[llama_wrapper] created context: n_ctx=" << cparams.n_ctx << " n_batch=" << cparams.n_batch << "\n";
+                    std::cout << "[llama_wrapper] created context: n_ctx=" << cparams.n_ctx
+                              << " n_batch=" << cparams.n_batch << "\n";
                 } else {
                     std::cerr << "[llama_wrapper] warning: could not create context (OOM?), falling back to simulation\n";
                 }
@@ -110,6 +154,7 @@ extern "C" {
             g_context = nullptr;
         }
         if (g_model) {
+            llama_backend_free();
             llama_model_free(g_model);
             g_model = nullptr;
             std::lock_guard<std::mutex> lk(g_cache_mutex);

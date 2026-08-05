@@ -1,0 +1,10 @@
+prefix=C:/Program Files (x86)/adaptive_engine_llama
+exec_prefix=C:/Program Files (x86)/adaptive_engine_llama
+libdir=C:/Program Files (x86)/adaptive_engine_llama/lib
+includedir=C:/Program Files (x86)/adaptive_engine_llama/include
+
+Name: llama
+Description: Port of Facebook's LLaMA model in C/C++
+Version: 0.0.10260
+Libs: -L${libdir} -lggml -lggml-base -lllama
+Cflags: -I${includedir}

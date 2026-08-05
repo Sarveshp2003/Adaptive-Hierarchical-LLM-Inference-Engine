@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Solution>
+	<Configurations>
+		<BuildType Name="Debug"/>
+		<BuildType Name="Release"/>
+		<BuildType Name="MinSizeRel"/>
+		<BuildType Name="RelWithDebInfo"/>
+		<Platform Name="x64"/>
+	</Configurations>
+	<Project Path="ALL_BUILD.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="e6881c7d-ec65-3063-9116-e792bf7f4bfa" DefaultStartup="true">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="ggml/src/ggml.vcxproj"/>
+		<BuildDependency Project="ggml/src/ggml-base.vcxproj"/>
+		<BuildDependency Project="ggml/src/ggml-cpu.vcxproj"/>
+		<BuildDependency Project="src/llama.vcxproj"/>
+	</Project>
+	<Project Path="INSTALL.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="21cd860c-2bc0-3905-8ec5-6e455d2df4dc">
+		<BuildDependency Project="ALL_BUILD.vcxproj"/>
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<Build Solution="Debug|*" Project="false"/>
+		<Build Solution="Release|*" Project="false"/>
+		<Build Solution="MinSizeRel|*" Project="false"/>
+		<Build Solution="RelWithDebInfo|*" Project="false"/>
+	</Project>
+	<Project Path="../ZERO_CHECK.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="310671f4-7999-35eb-ab6e-329a716ba326"/>
+	<Project Path="ggml/src/ggml.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="21fc3265-a76a-3101-83c0-5e2358fb497c">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="ggml/src/ggml-base.vcxproj"/>
+		<BuildDependency Project="ggml/src/ggml-cpu.vcxproj"/>
+	</Project>
+	<Project Path="ggml/src/ggml-base.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="2ff3b449-9a32-3014-8705-0a30c6c60153">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+	</Project>
+	<Project Path="ggml/src/ggml-cpu.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="aadff4ba-05bc-3881-8756-bb4cce89d6f1">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="ggml/src/ggml-base.vcxproj"/>
+	</Project>
+	<Project Path="src/llama.vcxproj" Type="8bc9ceb8-8b4a-11d0-8d11-00a0c91bc942" Id="2d531a6f-776d-3a90-8d19-b15c9155c34a">
+		<BuildDependency Project="../ZERO_CHECK.vcxproj"/>
+		<BuildDependency Project="ggml/src/ggml.vcxproj"/>
+		<BuildDependency Project="ggml/src/ggml-base.vcxproj"/>
+		<BuildDependency Project="ggml/src/ggml-cpu.vcxproj"/>
+	</Project>
+</Solution>

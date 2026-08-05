@@ -1,0 +1,15 @@
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/CMakeFiles/adaptive_engine_llama.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/CMakeFiles/INSTALL.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/CMakeFiles/ALL_BUILD.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/CMakeFiles/ZERO_CHECK.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/CMakeFiles/INSTALL.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/CMakeFiles/ALL_BUILD.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/ggml/CMakeFiles/INSTALL.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/ggml/CMakeFiles/ALL_BUILD.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/ggml/src/CMakeFiles/ggml-base.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/ggml/src/CMakeFiles/ggml.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/ggml/src/CMakeFiles/ggml-cpu.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/ggml/src/CMakeFiles/INSTALL.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/ggml/src/ggml-cpu/CMakeFiles/INSTALL.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/src/CMakeFiles/llama.dir
+E:/adaptivellm/native-engine/llama_wrapper/build_llama/llama_build/src/CMakeFiles/INSTALL.dir

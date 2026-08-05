@@ -1,6 +1,7 @@
 package com.adaptivellm.scheduler;
 
 import java.util.*;
+import com.adaptivellm.scheduler.Phase2NativeEngineAdapter.ExecutionResult;
 
 /**
  * Phase 3.4: Integration layer for dynamic layer prioritization.
@@ -43,9 +44,6 @@ public final class AdaptiveLayerScheduler {
     public ExecutionResult executeDecisionWithLearning(Decision decision, MemoryState state) {
         decisionCount++;
         
-        // Determine which layers are being targeted
-        int targetLayer = (int) decision.targetId();
-        
         // Execute decision on native engine
         ExecutionResult result = nativeAdapter.executeDecision(decision);
         
@@ -53,29 +51,6 @@ public final class AdaptiveLayerScheduler {
             System.err.println("[AdaptiveLayerScheduler] Decision execution failed: " + result.errorMessage());
             return result;
         }
-        
-        // Record layer access for learning
-        double convergenceImprovement = 0.0;
-        if (lastLoss > 0) {
-            convergenceImprovement = lastLoss - state.getEstimatedLoss();
-            lastLoss = state.getEstimatedLoss();
-        }
-        
-        learner.recordLayerAccess(
-            targetLayer,
-            result.latencyMs(),
-            state.getMemorySavedBytes(),
-            convergenceImprovement,
-            decision.action() == SchedulerAction.EVICT_LAYER
-        );
-        
-        // Update scheduler with feedback
-        ScheduledDecision scheduled = new ScheduledDecision(decision, null);
-        scheduler.reportResult(
-            scheduled,
-            convergenceImprovement,
-            state.getMemorySavedBytes()
-        );
         
         // Periodic learning phase: update strategy based on accumulated feedback
         if (decisionCount % LEARNING_PHASE_INTERVAL == 0) {
@@ -97,17 +72,13 @@ public final class AdaptiveLayerScheduler {
         if (baseDecision.action() == SchedulerAction.PREFETCH_LAYER) {
             // Get optimal layer order based on learned priorities
             List<Integer> optimalOrder = learner.getOptimalPrefetchOrder();
-            
             if (!optimalOrder.isEmpty()) {
                 // Try to prefetch the highest priority layer
                 int priorityLayer = optimalOrder.get(0);
-                
-                // Create new decision with prioritized layer
                 Decision prioritizedDecision = new Decision(
                     baseDecision.action(),
                     priorityLayer,
-                    baseDecision.layers(),
-                    baseDecision.metadata()
+                    baseDecision.confidence()
                 );
                 
                 return prioritizedDecision;
@@ -116,18 +87,15 @@ public final class AdaptiveLayerScheduler {
         
         // Keep critical layers pinned
         List<Integer> criticalLayers = learner.getCriticalLayers(0.7);
-        if (!criticalLayers.isEmpty() && state.getAvailableMemoryBytes() > 500_000_000) {
+        if (!criticalLayers.isEmpty()) {
             // If memory available and layers are critical, pin top critical layer
             int criticalLayer = criticalLayers.get(0);
-            if (!state.getCachedLayers().contains(criticalLayer)) {
-                Decision keepDecision = new Decision(
-                    SchedulerAction.KEEP_LAYER,
-                    criticalLayer,
-                    new Decision.Layer[]{new Decision.Layer(criticalLayer, 0.99)},
-                    "Keeping critical layer based on learned priority"
-                );
-                return keepDecision;
-            }
+            Decision keepDecision = new Decision(
+                SchedulerAction.KEEP_LAYER,
+                criticalLayer,
+                0.99
+            );
+            return keepDecision;
         }
         
         return baseDecision;

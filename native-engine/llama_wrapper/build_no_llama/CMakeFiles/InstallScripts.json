@@ -1,0 +1,12 @@
+{
+	"InstallScripts" : 
+	[
+		"E:/adaptivellm/native-engine/llama_wrapper/build_no_llama/cmake_install.cmake",
+		"E:/adaptivellm/native-engine/llama_wrapper/build_no_llama/llama_build/cmake_install.cmake",
+		"E:/adaptivellm/native-engine/llama_wrapper/build_no_llama/llama_build/ggml/cmake_install.cmake",
+		"E:/adaptivellm/native-engine/llama_wrapper/build_no_llama/llama_build/ggml/src/cmake_install.cmake",
+		"E:/adaptivellm/native-engine/llama_wrapper/build_no_llama/llama_build/ggml/src/ggml-cpu/cmake_install.cmake",
+		"E:/adaptivellm/native-engine/llama_wrapper/build_no_llama/llama_build/src/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

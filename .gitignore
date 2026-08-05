@@ -27,9 +27,12 @@ tmp/
 models/**/*.gguf
 models/**/*.bin
 models/**/*.safetensors
+test_models/
 *.gguf
 *.bin
 *.safetensors
+*.dmp
+ci_logs/
 
 # Python / Java temporary files
 __pycache__/

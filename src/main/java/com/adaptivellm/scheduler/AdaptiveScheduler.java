@@ -1,5 +1,6 @@
 package com.adaptivellm.scheduler;
 
+import java.io.IOException;
 import java.util.Objects;
 import java.util.List;
 
@@ -14,7 +15,7 @@ import java.util.List;
 public final class AdaptiveScheduler {
 
     private final FeatureExtractor extractor;
-    private final PredictorModel predictor;
+    private PredictorModel predictor;
     private final TrainingDataCollector collector;
     private MLTrainer trainer;  // Optional: for feedback-driven learning
 
@@ -45,10 +46,10 @@ public final class AdaptiveScheduler {
     /**
      * Evaluates current runtime state and generates scheduling decision.
      */
-    public ScheduledDecision evaluate(MemoryState state) {
+    public synchronized ScheduledDecision evaluate(MemoryState state) {
         double[] features = extractor.extractNormalized(state);
         Decision decision = predictor.predict(features);
-        TrainingSample sample = collector.record(state, decision);
+        TrainingSample sample = collector.record(state, decision, features);
         return new ScheduledDecision(decision, sample);
     }
 
@@ -56,7 +57,7 @@ public final class AdaptiveScheduler {
      * Reports execution result and updates training sample.
      * This is the feedback signal that drives improvement.
      */
-    public void reportResult(
+    public synchronized void reportResult(
             ScheduledDecision scheduled,
             double latencyImprovement,
             long memorySavedBytes
@@ -127,9 +128,38 @@ public final class AdaptiveScheduler {
     }
 
     /**
+     * Reload a persisted neural model into the scheduler.
+     */
+    public void reloadModelFromDisk(String modelName, ModelPersistence persistence)
+            throws IOException, ClassNotFoundException {
+        NeuralNetworkPredictor loaded = persistence.loadModel(modelName);
+        this.predictor = loaded;
+        System.out.println("[AdaptiveScheduler] Loaded persisted model: " + modelName);
+    }
+
+    /**
+     * Reload the latest persisted neural model into the scheduler.
+     */
+    public void reloadLatestModelFromDisk(ModelPersistence persistence)
+            throws IOException, ClassNotFoundException {
+        String latest = persistence.listModels().isEmpty() ? null : persistence.listModels().get(0);
+        if (latest == null) {
+            throw new IOException("No persisted models found");
+        }
+        reloadModelFromDisk(latest, persistence);
+    }
+
+    /**
      * Get the trainer instance.
      */
     public MLTrainer getTrainer() {
         return trainer;
+    }
+
+    /**
+     * Expose current predictor for runtime swap-ins.
+     */
+    public PredictorModel getPredictor() {
+        return predictor;
     }
 }

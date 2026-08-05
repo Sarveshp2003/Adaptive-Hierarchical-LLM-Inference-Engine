@@ -38,7 +38,7 @@ public final class RealModelInferenceTest {
 
         try {
             // Initialize native runtime client
-            RuntimeBridgeClient client = new RuntimeBridgeClient();
+            RuntimeBridgeClient client = new RuntimeBridgeClient("http://localhost:8080");
 
             // Test 1: Model Discovery
             testModelDiscovery();
@@ -412,13 +412,13 @@ public final class RealModelInferenceTest {
         return 0.3 + (rand.nextDouble() * 0.5);
     }
 
-    private static void simulateInferenceSequence(int tokens) {
+    private static void simulateInferenceSequence(int tokens) throws RuntimeException {
         try {
             for (int i = 0; i < tokens; i++) {
                 simulateTokenGeneration();
             }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException(ErrorCode.RUNTIME_ERROR, "Inference sequence failed", e);
         }
     }
 

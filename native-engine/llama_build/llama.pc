@@ -1,0 +1,10 @@
+prefix=C:/Program Files/adaptive_runtime
+exec_prefix=C:/Program Files/adaptive_runtime
+libdir=C:/Program Files/adaptive_runtime/lib
+includedir=C:/Program Files/adaptive_runtime/include
+
+Name: llama
+Description: Port of Facebook's LLaMA model in C/C++
+Version: 0.0.10260
+Libs: -L${libdir} -lggml -lggml-base -lllama
+Cflags: -I${includedir}

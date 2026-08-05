@@ -1,5 +1,6 @@
 package com.adaptivellm.scheduler;
 
+import com.adaptivellm.runtime.NativeInferenceEngine;
 import java.util.Objects;
 
 /**
@@ -10,6 +11,7 @@ import java.util.Objects;
  */
 public final class NativeEngineAdapter {
 
+    private final NativeInferenceEngine nativeEngine;
     private volatile boolean isRunning = false;
     private long lastRequestTimeMs = 0;
     private int requestCount = 0;
@@ -19,14 +21,15 @@ public final class NativeEngineAdapter {
      * Currently simulates native runtime behavior.
      */
     public NativeEngineAdapter() {
+        this(null);
     }
 
     /**
      * Create adapter with native engine object (for future integration).
      * @param nativeEngine The native engine instance
      */
-    public NativeEngineAdapter(Object nativeEngine) {
-        // Accept any object for now - for future integration with real NativeEngine
+    public NativeEngineAdapter(NativeInferenceEngine nativeEngine) {
+        this.nativeEngine = nativeEngine;
     }
 
     /**
@@ -121,11 +124,13 @@ public final class NativeEngineAdapter {
 
     private ExecutionResult executePrefetchLayer(int layerId, long startTimeMs) {
         try {
-            // Simulate prefetch operation (in production, call nativeEngine.requestLayer(layerId))
-            // This would be: nativeEngine.requestLayer(layerId);
-            Thread.sleep(5); // Simulate 5ms network latency
+            if (nativeEngine != null && nativeEngine.isInitialized()) {
+                long nativeResult = nativeEngine.prefetchLayer(layerId);
+                long latencyMs = nativeResult > 0 ? nativeResult : System.currentTimeMillis() - startTimeMs;
+                return ExecutionResult.success(latencyMs, 100 * 1024 * 1024);
+            }
+            Thread.sleep(5);
             long latencyMs = System.currentTimeMillis() - startTimeMs;
-            // Estimate memory saved based on layer size (rough estimate: 100MB per layer for 3B model)
             long memorySaved = 100 * 1024 * 1024;
             return ExecutionResult.success(latencyMs, memorySaved);
         } catch (Exception e) {
@@ -134,11 +139,15 @@ public final class NativeEngineAdapter {
     }
 
     private ExecutionResult executeEvictLayer(int layerId, long startTimeMs) {
-        // Eviction is typically faster than prefetch
         try {
+            if (nativeEngine != null && nativeEngine.isInitialized()) {
+                long nativeResult = nativeEngine.evictLayer(layerId);
+                long latencyMs = nativeResult > 0 ? nativeResult : 1;
+                return ExecutionResult.success(latencyMs, 100 * 1024 * 1024);
+            }
             long latencyMs = System.currentTimeMillis() - startTimeMs;
-            if (latencyMs == 0) latencyMs = 1; // Minimum 1ms for eviction
-            long memorySaved = 100 * 1024 * 1024; // Assume 100MB per layer
+            if (latencyMs == 0) latencyMs = 1;
+            long memorySaved = 100 * 1024 * 1024;
             return ExecutionResult.success(latencyMs, memorySaved);
         } catch (Exception e) {
             return ExecutionResult.failed("Evict failed: " + e.getMessage());
@@ -146,19 +155,30 @@ public final class NativeEngineAdapter {
     }
 
     private ExecutionResult executeKeepLayer(int layerId, long startTimeMs) {
-        // No-op operation
-        long latencyMs = System.currentTimeMillis() - startTimeMs;
-        if (latencyMs == 0) latencyMs = 1;
-        return ExecutionResult.success(latencyMs, 0);
+        try {
+            if (nativeEngine != null && nativeEngine.isInitialized()) {
+                long nativeResult = nativeEngine.keepLayer(layerId);
+                long latencyMs = nativeResult >= 0 ? Math.max(1, nativeResult) : 1;
+                return ExecutionResult.success(latencyMs, 0);
+            }
+            long latencyMs = System.currentTimeMillis() - startTimeMs;
+            if (latencyMs == 0) latencyMs = 1;
+            return ExecutionResult.success(latencyMs, 0);
+        } catch (Exception e) {
+            return ExecutionResult.failed("Keep layer failed: " + e.getMessage());
+        }
     }
 
     private ExecutionResult executeMoveKvToRam(long kvPageId, long startTimeMs) {
-        // Simulate KV move operation
         try {
+            if (nativeEngine != null && nativeEngine.isInitialized()) {
+                long nativeResult = nativeEngine.moveKvToRam(kvPageId);
+                long latencyMs = nativeResult > 0 ? nativeResult : 5;
+                return ExecutionResult.success(latencyMs, 10 * 1024 * 1024);
+            }
             long latencyMs = System.currentTimeMillis() - startTimeMs;
-            if (latencyMs == 0) latencyMs = 5; // Typical 5ms for KV move
-            // KV cache pages are smaller than layers
-            long memorySaved = 10 * 1024 * 1024; // ~10MB per page
+            if (latencyMs == 0) latencyMs = 5;
+            long memorySaved = 10 * 1024 * 1024;
             return ExecutionResult.success(latencyMs, memorySaved);
         } catch (Exception e) {
             return ExecutionResult.failed("Move KV to RAM failed: " + e.getMessage());
@@ -167,9 +187,14 @@ public final class NativeEngineAdapter {
 
     private ExecutionResult executeMoveKvToGpu(long kvPageId, long startTimeMs) {
         try {
+            if (nativeEngine != null && nativeEngine.isInitialized()) {
+                long nativeResult = nativeEngine.moveKvToGpu(kvPageId);
+                long latencyMs = nativeResult > 0 ? nativeResult : 8;
+                return ExecutionResult.success(latencyMs, 5 * 1024 * 1024);
+            }
             long latencyMs = System.currentTimeMillis() - startTimeMs;
             if (latencyMs == 0) latencyMs = 8;
-            long memorySaved = 5 * 1024 * 1024; // ~5MB GPU overhead
+            long memorySaved = 5 * 1024 * 1024;
             return ExecutionResult.success(latencyMs, memorySaved);
         } catch (Exception e) {
             return ExecutionResult.failed("Move KV to GPU failed: " + e.getMessage());
@@ -178,9 +203,14 @@ public final class NativeEngineAdapter {
 
     private ExecutionResult executeCompressKv(long kvPageId, long startTimeMs) {
         try {
+            if (nativeEngine != null && nativeEngine.isInitialized()) {
+                long nativeResult = nativeEngine.compressKv(kvPageId);
+                long latencyMs = nativeResult > 0 ? nativeResult : 10;
+                return ExecutionResult.success(latencyMs, 20 * 1024 * 1024);
+            }
             long latencyMs = System.currentTimeMillis() - startTimeMs;
-            if (latencyMs == 0) latencyMs = 10; // Compression takes ~10ms
-            long memorySaved = 20 * 1024 * 1024; // ~20% compression = 20MB saved
+            if (latencyMs == 0) latencyMs = 10;
+            long memorySaved = 20 * 1024 * 1024;
             return ExecutionResult.success(latencyMs, memorySaved);
         } catch (Exception e) {
             return ExecutionResult.failed("Compress KV failed: " + e.getMessage());
@@ -189,9 +219,14 @@ public final class NativeEngineAdapter {
 
     private ExecutionResult executeOffloadKv(long kvPageId, long startTimeMs) {
         try {
+            if (nativeEngine != null && nativeEngine.isInitialized()) {
+                long nativeResult = nativeEngine.offloadKv(kvPageId);
+                long latencyMs = nativeResult > 0 ? nativeResult : 15;
+                return ExecutionResult.success(latencyMs, 30 * 1024 * 1024);
+            }
             long latencyMs = System.currentTimeMillis() - startTimeMs;
-            if (latencyMs == 0) latencyMs = 15; // Offload to SSD takes ~15ms
-            long memorySaved = 30 * 1024 * 1024; // ~30MB freed from main memory
+            if (latencyMs == 0) latencyMs = 15;
+            long memorySaved = 30 * 1024 * 1024;
             return ExecutionResult.success(latencyMs, memorySaved);
         } catch (Exception e) {
             return ExecutionResult.failed("Offload KV failed: " + e.getMessage());

@@ -1,0 +1,266 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="BackgroundAgentGlobalSettings">
+    <option name="selectedModelId" value="auto" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="d45b7fef-b4ea-4deb-ac9a-f78eeb5c5cea" name="Changes" comment="implementing ai schedular">
+      <change afterPath="$PROJECT_DIR$/third_party/safetensors-cpp/gen/model.gguf" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/native-engine/llama_wrapper/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/native-engine/llama_wrapper/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/native-engine/llama_wrapper/llama.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/native-engine/llama_wrapper/llama.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/native-engine/llama_wrapper/llama.cpp/benches/dgx-spark/run-aime-120b-t8-x8-high.log" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/native-engine/llama_wrapper/llama_wrapper.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/native-engine/llama_wrapper/llama_wrapper.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/native-engine/llama_wrapper/native_jni.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/native-engine/llama_wrapper/native_jni.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/native-engine/minirepro/CMakeLists.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/native-engine/minirepro/mini_main.cpp" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/removed_docs_20260804_130156/PHASE_2_1_CPP_NATIVE_IMPLEMENTATION.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/removed_docs_20260804_130156/PHASE_2_COMPLETION_SUMMARY.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/removed_docs_20260804_130156/PHASE_2_PRODUCTION_WIRING.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/removed_docs_20260804_130156/PHASE_3_CLOUD_NATIVE_ORCHESTRATION.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/inference/LlamaInferenceClient.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/inference/LlamaInferenceClient.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/runtime/NativeInferenceEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/runtime/NativeInferenceEngine.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/runtime/Phase3EndToEndTest.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/runtime/RealModelInferenceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/runtime/RealModelInferenceTest.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/AdaptiveLayerScheduler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/AdaptiveLayerScheduler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/AdaptiveScheduler.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/AdaptiveScheduler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/FeatureExtractor.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/FeatureExtractor.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/FeedbackLoopDemo.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/LayerPrioritizationLearner.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/LayerPrioritizationLearner.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/NativeEngineAdapter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/NativeEngineAdapter.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/NeuralNetworkPredictor.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/NeuralNetworkPredictor.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/Phase2ProductionIntegrationTest.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/Phase3EndToEndTest.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/ProductionMemoryStateProvider.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/ProductionMemoryStateProvider.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/SchedulerRuntimeController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/SchedulerRuntimeController.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/TrainingDataCollector.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/TrainingDataCollector.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/TrainingSample.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/adaptivellm/scheduler/TrainingSample.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/llama.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/third_party/llama.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/llama.cpp/.gitmodules" beforeDir="false" afterPath="$PROJECT_DIR$/third_party/llama.cpp/.gitmodules" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/llama.cpp/benches/dgx-spark/run-aime-120b-t8-x8-high.log" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/llama.cpp/examples/llama.swiftui/llama.swiftui/Resources/models/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/third_party/llama.cpp/examples/llama.swiftui/llama.swiftui/Resources/models/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/llama.cpp/examples/model-conversion/scripts/utils/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/third_party/llama.cpp/examples/model-conversion/scripts/utils/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/llama.cpp/gguf-py/gguf/py.typed" beforeDir="false" afterPath="$PROJECT_DIR$/third_party/llama.cpp/gguf-py/gguf/py.typed" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/third_party/safetensors-cpp" beforeDir="false" afterPath="$PROJECT_DIR$/third_party/safetensors-cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vcpkg" beforeDir="false" afterPath="$PROJECT_DIR$/vcpkg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vcpkg/.vcpkg-root" beforeDir="false" afterPath="$PROJECT_DIR$/vcpkg/.vcpkg-root" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/vcpkg/ports/libflac/cmake-project-include.cmake" beforeDir="false" afterPath="$PROJECT_DIR$/vcpkg/ports/libflac/cmake-project-include.cmake" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_E:/adaptivellm" value="3HIWtdKzOcwtZ0kosexmwKq76PY" />
+    </persistenceIdMap>
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Class" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+    <option name="ROOT_SYNC" value="DONT_SYNC" />
+  </component>
+  <component name="ProblemsViewState">
+    <option name="selectedTabId" value="CurrentFile" />
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3HIWtdKzOcwtZ0kosexmwKq76PY" />
+  <component name="ProjectSessionTemplates">
+    <option name="panelTemplate">
+      <template>
+        <option name="modeId" value="Ask" />
+        <option name="model">
+          <model>
+            <option name="modelType" value="builtin_id" />
+            <option name="modelValue" value="auto" />
+          </model>
+        </option>
+        <option name="targetType" value="BACKGROUND" />
+        <option name="worktreeMode" value="WORKSPACE" />
+      </template>
+    </option>
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.LlamaInferenceClient.executor": "Run",
+    "Application.Main.executor": "Run",
+    "Application.NativeEngineTest.executor": "Run",
+    "Application.SequenceGenerator.executor": "Run",
+    "Maven.adaptivellm [clean,compile].executor": "Run",
+    "Maven.adaptivellm [clean,package,-DskipTests...].executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "copilot.chat.legacySessionMetadata.migrated": "true",
+    "git-widget-placeholder": "main",
+    "kotlin-language-version-configured": "true",
+    "nodejs_package_manager_path": "npm",
+    "onboarding.tips.debug.path": "E:/adaptivellm/src/main/java/com/adaptivellm/Main.java",
+    "project.structure.last.edited": "SDKs",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "settings.editor.selected.configurable": "preferences.pluginManager",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="E:\adaptivellm\native-engine\cpp" />
+      <recent name="E:\adaptivellm\native-engine" />
+    </key>
+  </component>
+  <component name="RunAnythingCache">
+    <option name="myCommands">
+      <command value="mvn clean package -DskipTests -q " />
+      <command value="mvn clean compile" />
+    </option>
+  </component>
+  <component name="RunManager" selected="Application.SequenceGenerator">
+    <configuration name="LlamaInferenceClient" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.adaptivellm.inference.LlamaInferenceClient" />
+      <module name="adaptivellm" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.adaptivellm.inference.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Main" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.adaptivellm.Main" />
+      <module name="adaptivellm" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.adaptivellm.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="NativeEngineTest" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.adaptivellm.nativeengine.NativeEngineTest" />
+      <module name="adaptivellm" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.adaptivellm.nativeengine.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="SequenceGenerator" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.adaptivellm.inference.SequenceGenerator" />
+      <module name="adaptivellm" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.adaptivellm.inference.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Application.SequenceGenerator" />
+        <item itemvalue="Application.LlamaInferenceClient" />
+        <item itemvalue="Application.NativeEngineTest" />
+        <item itemvalue="Application.Main" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-37e91769500f-intellij.indexing.shared.core-IU-261.26222.65" />
+        <option value="bundled-js-predefined-d6986cc7102b-31caf2ab9e3c-JavaScript-IU-261.26222.65" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="d45b7fef-b4ea-4deb-ac9a-f78eeb5c5cea" name="Changes" comment="" />
+      <created>1785556282805</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1785556282805</updated>
+      <workItem from="1785556283921" duration="25220000" />
+      <workItem from="1785581776838" duration="12062000" />
+      <workItem from="1785637859972" duration="705000" />
+      <workItem from="1785638578723" duration="403000" />
+      <workItem from="1785638993440" duration="22851000" />
+      <workItem from="1785671076039" duration="8624000" />
+      <workItem from="1785730765504" duration="440000" />
+      <workItem from="1785731433521" duration="49043000" />
+      <workItem from="1785783879047" duration="6000" />
+    </task>
+    <task id="LOCAL-00001" summary="implementing ai schedular">
+      <option name="closed" value="true" />
+      <created>1785818097345</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1785818097346</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="OPEN_GENERIC_TABS">
+      <map>
+        <entry key="a1526408-c354-4f8c-ac40-e518a2f46e01" value="TOOL_WINDOW" />
+      </map>
+    </option>
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+        <entry key="a1526408-c354-4f8c-ac40-e518a2f46e01">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="implementing ai schedular" />
+    <option name="LAST_COMMIT_MESSAGE" value="implementing ai schedular" />
+  </component>
+</project>

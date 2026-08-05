@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="E:\adaptivellm\native-engine\llama_wrapper\build_llama\CMakeFiles\2536be20b0762bb93a646bf85978b323\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{ADDDE065-8B79-3AA8-B7D5-E9A98C9D4D64}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
