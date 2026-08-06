@@ -281,7 +281,150 @@ public final class NativeInferenceEngine {
             throw new RuntimeException(ErrorCode.JNI_ERROR, "Inference failed");
         }
         
-        return new InferencePrediction(nextToken, logits);
+        // Default behavior: return native-picked token (greedy) plus logits
+        InferencePrediction basePred = new InferencePrediction(nextToken, logits);
+
+        return basePred;
+    }
+
+    /**
+     * Run a single inference step and sample next token using decoding parameters.
+     * If temperature == 0, behaves deterministically (argmax).
+     */
+    public InferencePrediction inferWithSampling(int[] inputTokens, double temperature, int topK, double topP, int[] recentTokens, double repetitionPenalty) throws RuntimeException {
+        if (!initialized) {
+            throw new IllegalStateException("Engine not initialized");
+        }
+        if (inputTokens == null || inputTokens.length == 0) {
+            throw new IllegalArgumentException("Input tokens cannot be null or empty");
+        }
+        if (vocabSize <= 0) {
+            throw new IllegalStateException("Invalid vocabulary size");
+        }
+
+        // Get logits from native inference
+        float[] logits = new float[vocabSize];
+        int nativeNext = nativeInfer(inputTokens, inputTokens.length, logits, vocabSize);
+        if (nativeNext < 0) {
+            throw new RuntimeException(ErrorCode.JNI_ERROR, "Inference failed");
+        }
+
+        int sampled = sampleFromLogits(logits, temperature, topK, topP, recentTokens, repetitionPenalty);
+        return new InferencePrediction(sampled, logits);
+    }
+
+    /**
+     * Sample a token id from logits using temperature, top-k, top-p (nucleus), and repetition penalty.
+     * This is implemented in Java so JNI/native rebuild is not required.
+     */
+    public static int sampleFromLogits(float[] logits, double temperature, int topK, double topP, int[] recentTokens, double repetitionPenalty) {
+        if (logits == null || logits.length == 0) return -1;
+        int vocab = logits.length;
+
+        // If temperature == 0 → deterministic argmax
+        if (temperature <= 0.0) {
+            int argmax = 0;
+            float max = logits[0];
+            for (int i = 1; i < vocab; ++i) {
+                if (logits[i] > max) { max = logits[i]; argmax = i; }
+            }
+            return argmax;
+        }
+
+        // Copy logits to a double array for stable processing
+        double[] scores = new double[vocab];
+        for (int i = 0; i < vocab; ++i) scores[i] = logits[i];
+
+        // Apply repetition penalty: for each recent token, penalize its score
+        if (recentTokens != null && recentTokens.length > 0 && repetitionPenalty > 1.0) {
+            for (int rt : recentTokens) {
+                if (rt >= 0 && rt < vocab) {
+                    // Typical penalty: divide score for repeating token (logit-space)
+                    scores[rt] = scores[rt] / repetitionPenalty;
+                }
+            }
+        }
+
+        // Temperature scaling (divide logits by temperature)
+        double invTemp = 1.0 / temperature;
+        for (int i = 0; i < vocab; ++i) scores[i] = scores[i] * invTemp;
+
+        // Apply top-k: keep only topK scores, others -> -Inf
+        int k = Math.max(1, Math.min(topK, vocab));
+        if (k < vocab) {
+            // find threshold via partial selection
+            double[] copy = Arrays.copyOf(scores, vocab);
+            java.util.Arrays.sort(copy); // ascending
+            double kth = copy[vocab - k];
+            for (int i = 0; i < vocab; ++i) {
+                if (scores[i] < kth) scores[i] = Double.NEGATIVE_INFINITY;
+            }
+        }
+
+        // Convert scores to probabilities using softmax, but support top-p by zeroing small probs
+        double maxScore = Double.NEGATIVE_INFINITY;
+        for (int i = 0; i < vocab; ++i) if (scores[i] > maxScore) maxScore = scores[i];
+        double sumExp = 0.0;
+        double[] expScores = new double[vocab];
+        for (int i = 0; i < vocab; ++i) {
+            if (scores[i] == Double.NEGATIVE_INFINITY) { expScores[i] = 0.0; continue; }
+            double v = Math.exp(scores[i] - maxScore);
+            expScores[i] = v;
+            sumExp += v;
+        }
+        if (sumExp <= 0.0) {
+            // fallback to argmax
+            int argmax = 0; double best = scores[0];
+            for (int i = 1; i < vocab; ++i) { if (scores[i] > best) { best = scores[i]; argmax = i; } }
+            return argmax;
+        }
+
+        // Normalize to probabilities
+        double[] probs = new double[vocab];
+        for (int i = 0; i < vocab; ++i) probs[i] = expScores[i] / sumExp;
+
+        // Apply top-p nucleus sampling: keep smallest set with cumulative prob >= topP
+        if (topP > 0.0 && topP < 1.0) {
+            // create array of indices sorted by prob desc
+            Integer[] idx = new Integer[vocab];
+            for (int i = 0; i < vocab; ++i) idx[i] = i;
+            java.util.Arrays.sort(idx, (a, b) -> Double.compare(probs[b], probs[a]));
+            double cum = 0.0;
+            boolean[] keep = new boolean[vocab];
+            for (int j = 0; j < vocab; ++j) {
+                int i = idx[j];
+                cum += probs[i];
+                keep[i] = true;
+                if (cum >= topP) break;
+            }
+            // zero out the rest
+            double newSum = 0.0;
+            for (int i = 0; i < vocab; ++i) {
+                if (!keep[i]) probs[i] = 0.0; else newSum += probs[i];
+            }
+            if (newSum <= 0.0) {
+                // fallback argmax
+                int argmax = 0; double best = probs[0];
+                for (int i = 1; i < vocab; ++i) { if (probs[i] > best) { best = probs[i]; argmax = i; } }
+                return argmax;
+            }
+            // renormalize
+            for (int i = 0; i < vocab; ++i) probs[i] /= newSum;
+        }
+
+        // Sample from probs
+        double r = java.util.concurrent.ThreadLocalRandom.current().nextDouble();
+        double acc = 0.0;
+        for (int i = 0; i < vocab; ++i) {
+            acc += probs[i];
+            if (r <= acc) return i;
+        }
+        // numerical fallback
+        for (int i = vocab - 1; i >= 0; --i) if (probs[i] > 0.0) return i;
+        // last resort
+        int argmax = 0; double best = probs[0];
+        for (int i = 1; i < vocab; ++i) { if (probs[i] > best) { best = probs[i]; argmax = i; } }
+        return argmax;
     }
 
     /**
@@ -333,6 +476,21 @@ public final class NativeInferenceEngine {
     public int getEosToken() {
         if (!initialized) throw new IllegalStateException("Engine not initialized");
         return eosToken;
+    }
+
+    /**
+     * Retrieve the tokenizer.chat_template string from the native model metadata (if available).
+     */
+    public String getChatTemplate() {
+        if (!initialized) throw new IllegalStateException("Engine not initialized");
+        try {
+            String tmpl = nativeGetChatTemplate();
+            if (tmpl != null && !tmpl.isBlank()) return tmpl;
+        } catch (UnsatisfiedLinkError | NoSuchMethodError e) {
+            // native getter not available in this build; fall through to env fallback
+        }
+        String env = System.getenv("ADAPTIVELLM_CHAT_TEMPLATE");
+        return env == null ? "" : env;
     }
 
     /**
@@ -528,6 +686,9 @@ public final class NativeInferenceEngine {
     private native int nativeInfer(int[] inputTokens, int tokenCount, float[] logitsOut, int maxLogits);
     private native double nativeComputePerplexity(int[] tokens, int tokenCount);
     private native long nativePrefetchLayer(int layerId);
+    
+    // Optional native getter for model chat template (may be unavailable if native not rebuilt)
+    private native String nativeGetChatTemplate();
     private native long nativeEvictLayer(int layerId);
     private native long nativeKeepLayer(int layerId);
     private native long nativeMoveKvToRam(long kvPageId);

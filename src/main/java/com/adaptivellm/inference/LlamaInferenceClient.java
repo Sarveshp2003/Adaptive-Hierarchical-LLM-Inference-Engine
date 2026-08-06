@@ -14,6 +14,7 @@ import java.io.BufferedReader;
 import java.io.Console;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 /**
  * Simple interactive client to chat with Llama model.
@@ -51,8 +52,23 @@ public class LlamaInferenceClient {
             schedulerController.start();
             System.out.println("🧠 Scheduler started\n");
 
-            // Interactive loop
-            runInteractiveMode();
+            // If invoked with --template-test, run several prompt templates (debugging) then exit
+            if (args != null && args.length > 0 && "--template-test".equals(args[0])) {
+                String[] templates = new String[] {
+                    "Explain adaptive learning",
+                    "You are a helpful assistant. Explain adaptive learning concisely.",
+                    "Instruction: Explain adaptive learning",
+                    "User: what is adaptive learning\nAssistant:",
+                    "System: You are a helpful assistant.\nUser: what is adaptive learning\nAssistant:"
+                };
+                for (String t : templates) {
+                    System.out.println("\n=== Template test: '" + t + "' ===");
+                    processPrompt(t);
+                }
+            } else {
+                // Interactive loop
+                runInteractiveMode();
+            }
 
             // Cleanup
             if (schedulerController != null) {
@@ -154,12 +170,38 @@ public class LlamaInferenceClient {
                 return;
             }
 
+            // Reinitialize engine for a clean context (expensive; for debugging only)
+            System.out.print("  [0/4] Reinitializing engine... ");
+            try {
+                engine.shutdown();
+                engine.initialize(true);
+                System.out.println("✓ reinitialized");
+            } catch (Exception ex) {
+                System.out.println("⚠️ reinit failed: " + ex.getMessage());
+            }
+
             // Step 1: Tokenize
             System.out.print("  [1/4] Tokenizing... ");
-            String chatPrompt = "<|begin_of_text|><|start_header_id|>user<|end_header_id|>\n" + prompt + "<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n";
+            // Use model-provided chat_template when available as a prefix
+            String modelTemplate = "";
+            try {
+                modelTemplate = engine.getChatTemplate();
+            } catch (Throwable ignored) {}
+
+            String chatPrompt;
+            if (modelTemplate != null && !modelTemplate.isBlank()) {
+                chatPrompt = modelTemplate + "\nUser: " + prompt + "\nAssistant: ";
+                System.out.println("\n[debug] using model chat_template as prefix");
+            } else {
+                chatPrompt = "System: You are a helpful assistant.\nUser: " + prompt + "\nAssistant: ";
+                System.out.println("\n[debug] chatPrompt (system+role):\n" + chatPrompt);
+            }
+
             int[] promptTokens = engine.tokenize(chatPrompt);
-            int[] visiblePromptTokens = engine.tokenize(prompt);
-            System.out.println("✓ " + promptTokens.length + " tokens (prompt=" + visiblePromptTokens.length + ")");
+            int[] visiblePromptTokens = promptTokens;
+            // Verify round-trip detokenization of prompt tokens (short preview)
+            String promptPreview = engine.detokenize(Arrays.copyOf(promptTokens, Math.min(promptTokens.length, 64)));
+            System.out.println("✓ " + promptTokens.length + " tokens (prompt=" + visiblePromptTokens.length + ") preview='" + promptPreview.replaceAll("\n","\\n") + "'");
 
             // Step 2: Ask the scheduler for a decision before each generation step.
             System.out.print("  [2/4] Generating... ");
@@ -169,10 +211,33 @@ public class LlamaInferenceClient {
             int generated = 0;
 
             java.util.List<Integer> generatedTokens = new java.util.ArrayList<>();
-            int currentToken = promptTokens.length > 0 ? promptTokens[promptTokens.length - 1] : 0;
             StringBuilder streamed = new StringBuilder();
 
-            for (int i = 0; i < MAX_GEN; i++) {
+            // Prime model with full prompt tokens so context is set
+            NativeInferenceEngine.InferencePrediction initPred = engine.infer(promptTokens);
+            int firstToken = initPred.nextToken;
+            generatedTokens.add(firstToken);
+            generated = 1;
+            String firstText = engine.detokenize(new int[] { firstToken });
+            System.out.print(firstText);
+            System.out.flush();
+            streamed.append(firstText);
+            // Use firstToken as current for further autoregressive steps
+            int currentToken = firstToken;
+
+            // Decoding params (env overrides)
+            double temperature = 0.7;
+            int topK = 40;
+            double topP = 0.9;
+            double repPenalty = 1.1;
+            try {
+                String t = System.getenv("ADAPTIVELLM_TEMPERATURE"); if (t != null) temperature = Double.parseDouble(t);
+                String k = System.getenv("ADAPTIVELLM_TOP_K"); if (k != null) topK = Integer.parseInt(k);
+                String p = System.getenv("ADAPTIVELLM_TOP_P"); if (p != null) topP = Double.parseDouble(p);
+                String r = System.getenv("ADAPTIVELLM_REP_PENALTY"); if (r != null) repPenalty = Double.parseDouble(r);
+            } catch (Exception ex) { /* ignore */ }
+
+            for (int i = 1; i < MAX_GEN; i++) {
                 try {
                     MemoryState state = new MemoryState(
                             i,
@@ -198,8 +263,14 @@ public class LlamaInferenceClient {
                         System.out.print("[scheduler:" + decision.action() + "] ");
                     }
 
-                    NativeInferenceEngine.InferencePrediction pred = engine.infer(new int[] { currentToken });
+                    int[] recent = generatedTokens.stream().mapToInt(Integer::intValue).toArray();
+                    NativeInferenceEngine.InferencePrediction pred = engine.inferWithSampling(new int[] { currentToken }, temperature, topK, topP, recent, repPenalty);
                     int nt = pred.nextToken;
+                    // Debug: on first autoregressive step (i==1), print the selected token id and its detokenized text
+                    if (i == 1) {
+                        String tokText = engine.detokenize(new int[] { nt });
+                        System.out.println("[debug] selected_next=" + nt + " -> '" + tokText.replaceAll("\n","\\n") + "'");
+                    }
                     generatedTokens.add(nt);
                     generated++;
 
