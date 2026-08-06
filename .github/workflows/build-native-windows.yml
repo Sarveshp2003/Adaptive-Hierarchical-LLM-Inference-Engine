@@ -1,0 +1,36 @@
+name: Build native Windows
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions: {}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure CMake (CPU build)
+        shell: powershell
+        run: |
+          Set-Variable -Name RepoRoot -Value ${{ github.workspace }}\native-engine
+          cmake -S "${{ github.workspace }}\native-engine" -B "${{ github.workspace }}\native-engine\build" -A x64 -DADAPTIVELLM_ENABLE_CUDA=OFF -DHAVE_LLAMA=ON -DGGML_CUDA=OFF
+
+      - name: Build (Release)
+        shell: powershell
+        run: |
+          cmake --build "${{ github.workspace }}\native-engine\build" --config Release -- /m
+
+      - name: Locate built DLL
+        shell: powershell
+        run: |
+          $dll = Get-ChildItem -Path "${{ github.workspace }}\native-engine\build" -Filter adaptive_engine.dll -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $dll) { Write-Error "adaptive_engine.dll not found" ; exit 1 }
+          Write-Host "Found DLL: $($dll.FullName)"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: adaptive_engine_windows_x64
+          path: native-engine/build

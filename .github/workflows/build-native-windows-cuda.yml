@@ -1,0 +1,28 @@
+name: Build native Windows (optional CUDA)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-windows-cuda:
+    runs-on: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure CMake (attempt CUDA)
+        shell: powershell
+        run: |
+          # This job attempts to configure a CUDA build. Hosted runners may not have CUDA toolkit installed.
+          cmake -S "${{ github.workspace }}\native-engine" -B "${{ github.workspace }}\native-engine\build-cuda" -A x64 -DADAPTIVELLM_ENABLE_CUDA=ON -DHAVE_LLAMA=ON -DGGML_CUDA=ON
+
+      - name: Build (Release)
+        shell: powershell
+        run: |
+          cmake --build "${{ github.workspace }}\native-engine\build-cuda" --config Release -- /m
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: adaptive_engine_windows_x64_cuda
+          path: native-engine/build-cuda
