@@ -2,9 +2,9 @@ name: Build Native Library and Run Integration Test
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-matrix:
@@ -40,36 +40,56 @@ jobs:
         run: |
           set -e
           set -x
+
           echo "=== Diagnostics ==="
           echo "USER: $(whoami)"
           echo "PWD: $(pwd)"
           echo "JAVA_HOME: $JAVA_HOME"
-          echo "Java version:"; java -version || true
-          echo "javac version:"; javac -version || true
-          echo "which g++:"; which g++ || true
-          echo "g++ --version:"; g++ --version || true
-          echo "ls root:"; ls -lah || true
+          java -version || true
+          javac -version || true
+          which g++ || true
+          g++ --version || true
+          ls -lah || true
           cat /etc/os-release || true
+
           echo "=== Begin build ==="
+
           mkdir -p lib
+
           echo "[COMPILE] Building adaptive_scheduler native lib"
-          g++ -shared -fPIC -O2 -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/linux" -I"src/main/cpp/headers" -o lib/libadaptive_scheduler.so src/main/cpp/adaptive_scheduler.cpp -pthread || (echo "adaptive_scheduler build failed"; exit 1)
+          g++ -shared -fPIC -O2 \
+            -I"$JAVA_HOME/include" \
+            -I"$JAVA_HOME/include/linux" \
+            -I"src/main/cpp/headers" \
+            -o lib/libadaptive_scheduler.so \
+            src/main/cpp/adaptive_scheduler.cpp \
+            -pthread
+
           echo "[COMPILE] Building adaptive_engine shim"
-          g++ -shared -fPIC -O2 -o lib/libadaptive_engine.so native-engine/shim/adaptive_engine_shim.cpp -pthread || (echo "adaptive_engine_shim build failed"; exit 1)
-          echo "[COMPILE] Building llama_wrapper engine (fast single-file build)"
-          g++ -shared -fPIC -O2 -I"src/main/cpp/headers" -o lib/libadaptive_engine_llama.so native-engine/llama_wrapper/llama_wrapper.cpp -pthread || (echo "llama_wrapper build failed"; exit 1)
-          echo "[COMPILE] Attempting full llama.cpp CMake build (if submodule present)"
+          g++ -shared -fPIC -O2 \
+            -o lib/libadaptive_engine.so \
+            native-engine/shim/adaptive_engine_shim.cpp \
+            -pthread
+
+          echo "[COMPILE] Building llama_wrapper engine"
+          g++ -shared -fPIC -O2 \
+            -I"src/main/cpp/headers" \
+            -o lib/libadaptive_engine_llama.so \
+            native-engine/llama_wrapper/llama_wrapper.cpp \
+            -pthread
+
+          echo "[COMPILE] Attempting full llama.cpp CMake build"
           mkdir -p build/llama_build
-          cmake -S native-engine/llama_wrapper -B build/llama_build || echo "cmake configure failed"
-          cmake --build build/llama_build --target adaptive_engine_llama -- -j 2 || echo "cmake build failed"
-          echo "[INFO] Built lib contents:" 
-          ls -lah lib || true
+          cmake -S native-engine/llama_wrapper -B build/llama_build || true
+          cmake --build build/llama_build --target adaptive_engine_llama -- -j2 || true
+
+          echo "Built libraries:"
+          ls -lah lib
 
       - name: Build native library (Windows)
         if: runner.os == 'Windows'
         shell: cmd
-        run: |
-          build_native_library.bat
+        run: build_native_library.bat
 
       - name: Upload native lib artifact
         uses: actions/upload-artifact@v4
@@ -81,6 +101,7 @@ jobs:
     name: Run Phase2 Integration Test
     runs-on: ubuntu-latest
     needs: build-matrix
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -102,11 +123,13 @@ jobs:
           mkdir -p bin
           find src/main/java -name "*.java" | xargs javac -d bin
 
-      - name: Run Phase2ProductionIntegrationTest (dry run)
+      - name: Run Phase2ProductionIntegrationTest
         run: |
-          java -Djava.library.path=lib -cp bin com.adaptivellm.scheduler.Phase2ProductionIntegrationTest
+          java -Djava.library.path=lib \
+            -cp bin \
+            com.adaptivellm.scheduler.Phase2ProductionIntegrationTest
 
-      - name: Upload test output (logs)
+      - name: Upload test logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -116,9 +139,10 @@ jobs:
             bin
 
   system-check:
-    name: Full system check (extended)
+    name: Full system check
     runs-on: ubuntu-latest
     needs: build-matrix
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -140,12 +164,15 @@ jobs:
           mkdir -p bin
           find src/main/java -name "*.java" | xargs javac -d bin
 
-      - name: Run Phase2ProductionIntegrationTest (extended)
+      - name: Run extended integration test
         run: |
-          # Run with 1000 decisions for a longer system check
-          java -Dphase2.decisions=1000 -Djava.library.path=lib -cp bin com.adaptivellm.scheduler.Phase2ProductionIntegrationTest
+          java \
+            -Dphase2.decisions=1000 \
+            -Djava.library.path=lib \
+            -cp bin \
+            com.adaptivellm.scheduler.Phase2ProductionIntegrationTest
 
-      - name: Upload system-check output (logs)
+      - name: Upload system check logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -158,47 +185,58 @@ jobs:
     name: Model-loaded smoke test
     runs-on: ubuntu-latest
     needs: build-matrix
+
     env:
-        LLAMA_MODEL_URL: ${{ secrets.LLAMA_MODEL_URL }}
+      LLAMA_MODEL_URL: ${{ secrets.LLAMA_MODEL_URL }}
+
     steps:
-        - name: Checkout
-          uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-        - name: Download linux native artifact
-          uses: actions/download-artifact@v4
-          with:
-            name: adaptive_scheduler-ubuntu-latest
-            path: lib
+      - name: Download linux native artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: adaptive_scheduler-ubuntu-latest
+          path: lib
 
-        - name: Set up JDK
-          uses: actions/setup-java@v4
-          with:
-            distribution: temurin
-            java-version: '17'
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
 
-        - name: Compile Java sources
-          run: |
-            mkdir -p bin
-            find src/main/java -name "*.java" | xargs javac -d bin
+      - name: Compile Java sources
+        run: |
+          mkdir -p bin
+          find src/main/java -name "*.java" | xargs javac -d bin
 
-        - name: Download small test model and run model-loaded smoke test
-          run: |
-            if [ -z "$LLAMA_MODEL_URL" ]; then
-          echo "LLAMA_MODEL_URL not set -- skipping model-loaded smoke test"
-          exit 0
-            fi
-            mkdir -p lib/model
-            echo "Downloading model from $LLAMA_MODEL_URL"
-            curl -L "$LLAMA_MODEL_URL" -o lib/model/test_model.gguf
-            export LLAMA_MODEL_PATH=$(pwd)/lib/model/test_model.gguf
-            echo "LLAMA_MODEL_PATH=$LLAMA_MODEL_PATH"
-            java -Djava.library.path=lib -cp bin com.adaptivellm.scheduler.Phase2ProductionIntegrationTest
+      - name: Download model and run smoke test
+        shell: bash
+        run: |
+          if [ -z "$LLAMA_MODEL_URL" ]; then
+            echo "LLAMA_MODEL_URL not set -- skipping model smoke test"
+            exit 0
+          fi
 
-        - name: Upload model-smoke logs
-          if: always()
-          uses: actions/upload-artifact@v4
-          with:
-            name: phase2-model-smoke-logs
-            path: |
-          lib
-          bin
+          mkdir -p lib/model
+
+          echo "Downloading model..."
+          curl -L "$LLAMA_MODEL_URL" -o lib/model/test_model.gguf
+
+          export LLAMA_MODEL_PATH="$(pwd)/lib/model/test_model.gguf"
+
+          echo "LLAMA_MODEL_PATH=$LLAMA_MODEL_PATH"
+
+          java \
+            -Djava.library.path=lib \
+            -cp bin \
+            com.adaptivellm.scheduler.Phase2ProductionIntegrationTest
+
+      - name: Upload model smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase2-model-smoke-logs
+          path: |
+            lib
+            bin
