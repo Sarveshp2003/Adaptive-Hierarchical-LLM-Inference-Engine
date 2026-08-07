@@ -73,7 +73,7 @@ Generated Response + Scheduler Decisions Shown in Real-time
 
 ### Example Output:
 ```
-⏳ Processing...
+Processing...
   [1/4] Tokenizing... ✓ 35 tokens (prompt=8)
   [2/4] Generating... [scheduler:prefetch] ML e[scheduler:prefetch] nabl
          [scheduler:prefetch] es c[scheduler:prefetch] ompu
@@ -81,7 +81,7 @@ Generated Response + Scheduler Decisions Shown in Real-time
   [3/4] Decoding... ✓
   [4/4] Computing perplexity... ✓ 2.1847
 
-📊 INFERENCE RESULTS
+INFERENCE RESULTS
 Input:      "Explain machine learning"
 Tokens:     8 prompt + 16 generated
 Time:       125ms (7.8ms per token)
@@ -98,17 +98,17 @@ Response:   ML enables computers to learn from data without...
 
 ## Current Status
 
-### ✅ Working Features
+###  Working Features
 - Interactive REPL with multiple prompts
 - Real-time adaptive scheduler decisions
 - Memory state feature extraction
 - Scheduler integrated into inference loop
 - Proper tokenization and response formatting
 
-### ⏳ Current Mode: Simulator
+###  Current Mode: Simulator
 The system is running in **simulator mode** because the native C++ DLL has unresolved transitive dependencies. The scheduler and architecture are **fully functional** - the simulation just replaces real inference with pre-generated responses to demonstrate the complete pipeline.
 
-### 🔧 To Enable Real Inference (Advanced)
+###  To Enable Real Inference (Advanced)
 
 **Option A: Rebuild Native Engine with Static Linking**
 ```bash
