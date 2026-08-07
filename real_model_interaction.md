@@ -155,7 +155,7 @@ xcopy "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.3\bin\*.dll" `
 | **Tokens** | "8 prompt + 16 generated" = input size + output size |
 | **Time** | Total wall-clock time for generation |
 | **Per-token** | Time / token count = speed per token |
-| **Perplexity** | Model confidence score (lower is better) |
+| **Perplexity** | Model confidence score |
 
 ---
 
